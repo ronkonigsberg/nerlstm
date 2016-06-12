@@ -34,6 +34,16 @@ while word_index < len(dev_words):
     dev_sentences.append([(word_.text, word_.gold_label) for word_ in sentence])
     word_index += len(sentence)
 
+test_file_path = '/Users/konix/Workspace/nertagger/data/eng.testb'
+test_words = parsed_documents_to_words(parse_conll_train(open(test_file_path, 'rb').read()))
+BILOU.encode(test_words, 'gold_label')
+test_sentences = []
+word_index = 0
+while word_index < len(test_words):
+    sentence = test_words[word_index].sentence
+    test_sentences.append([(word_.text, word_.gold_label) for word_ in sentence])
+    word_index += len(sentence)
+
 train = train_sentences
 test = dev_sentences
 
@@ -143,7 +153,7 @@ def tag_sent(sent, model, builders):
 
 
 tagged = loss = 0
-for ITER in xrange(6):
+for ITER in xrange(5):
     random.shuffle(train)
     for i,s in enumerate(train,1):
         if i % 5000 == 0:
@@ -180,8 +190,22 @@ while word_index < len(dev_words):
         word.tag = tag
 
     word_index += len(sentence)
-
 BILOU.decode(dev_words, 'gold_label')
 BILOU.decode(dev_words, 'tag')
 dev_text = format_conll_tagged(words_to_parsed_documents(dev_words))
 open('/tmp/dev_ner', 'wb').write(dev_text)
+
+
+word_index = 0
+while word_index < len(test_words):
+    sentence = test_words[word_index].sentence
+    sentence_for_tagging = [(word_.text, None) for word_ in sentence]
+    tags = tag_sent(sentence_for_tagging, model, builders)
+
+    for word, tag in zip(sentence, tags):
+        word.tag = tag
+
+    word_index += len(sentence)
+BILOU.decode(test_words, 'tag')
+test_text = format_conll_tagged(words_to_parsed_documents(test_words))
+open('/tmp/test_ner', 'wb').write(test_text)
