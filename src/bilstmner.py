@@ -4,6 +4,7 @@ import random
 import gc
 from nertagger.parser import parse_conll_train, format_conll_tagged
 from nertagger.word import parsed_documents_to_words, words_to_parsed_documents
+from nertagger.tag_scheme import BILOU
 import numpy as np
 
 import util
@@ -15,6 +16,7 @@ MLP = True
 # format of files: each line is "word<TAB>tag<newline>", blank line is new sentence.
 train_file_path = '/Users/konix/Workspace/nertagger/data/eng.train'
 train_words = parsed_documents_to_words(parse_conll_train(open(train_file_path, 'rb').read()))
+BILOU.encode(train_words, 'gold_label')
 train_sentences = []
 word_index = 0
 while word_index < len(train_words):
@@ -24,6 +26,7 @@ while word_index < len(train_words):
 
 dev_file_path = '/Users/konix/Workspace/nertagger/data/eng.testa'
 dev_words = parsed_documents_to_words(parse_conll_train(open(dev_file_path, 'rb').read()))
+BILOU.encode(dev_words, 'gold_label')
 dev_sentences = []
 word_index = 0
 while word_index < len(dev_words):
@@ -178,5 +181,7 @@ while word_index < len(dev_words):
 
     word_index += len(sentence)
 
+BILOU.decode(dev_words, 'gold_label')
+BILOU.decode(dev_words, 'tag')
 dev_text = format_conll_tagged(words_to_parsed_documents(dev_words))
 open('/tmp/dev_ner', 'wb').write(dev_text)
