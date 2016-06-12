@@ -73,12 +73,12 @@ ntags  = vt.size()
 model = Model()
 sgd = SimpleSGDTrainer(model)
 
-model.add_lookup_parameters("lookup", (nwords, 200))
+model.add_lookup_parameters("lookup", (nwords, 300))
 model.add_lookup_parameters("tl", (ntags, 5))
 
 # My Code: initialize word lookup based on pre-trained embeddings
 embedding_by_word = {}
-for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.200d.txt', 'rb').readlines():
+for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.300d.txt', 'rb').readlines():
     word, embedding_str = line.split(' ', 1)
     embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
     embedding_by_word[word] = embedding
@@ -97,8 +97,8 @@ else:
     pO = model.add_parameters("OUT", (ntags, 50*2))
 
 builders=[
-        LSTMBuilder(1, 200, 50, model),
-        LSTMBuilder(1, 200, 50, model),
+        LSTMBuilder(1, 300, 50, model),
+        LSTMBuilder(1, 300, 50, model),
         ]
 
 def build_tagging_graph(words, tags, model, builders):
