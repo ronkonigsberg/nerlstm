@@ -56,8 +56,18 @@ model.add_lookup_parameters("lookup", (nwords, 200))
 model.add_lookup_parameters("tl", (ntags, 30))
 
 # My Code: initialize word lookup based on pre-trained embeddings
-
-
+embedding_by_word = {}
+for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.200d.txt', 'rb').readlines():
+    word, embedding_str = line.split(' ', 1)
+    embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
+    embedding_by_word[word] = embedding
+word_lookup = model["lookup"]
+for idx in xrange(vw.size()):
+    word = vw.i2w[idx]
+    if word in embedding_by_word:
+        word_lookup.init_row(idx, embedding_by_word[word])
+del embedding_by_word
+gc.collect()
 
 if MLP:
     pH = model.add_parameters("HID", (32, 50*2))
