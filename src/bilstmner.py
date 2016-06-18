@@ -1,100 +1,81 @@
-from pycnn import *
-from collections import Counter
 import random
 import gc
-from nertagger.parser import parse_conll_train, format_conll_tagged
-from nertagger.word import parsed_documents_to_words, words_to_parsed_documents
-from nertagger.tag_scheme import BILOU
+from collections import Counter
+
 import numpy as np
+from pycnn import *
 
-import util
+from nertagger.tag_scheme import BILOU, BIO
+
+from parse import parse_words, split_words_to_sentences, format_words
+from indexer import Indexer
 
 
-MLP = True
+TRAIN_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.train'
+DEV_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testa'
+TEST_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testb'
 
 
-# format of files: each line is "word<TAB>tag<newline>", blank line is new sentence.
-train_file_path = '/Users/konix/Workspace/nertagger/data/eng.train'
-train_words = parsed_documents_to_words(parse_conll_train(open(train_file_path, 'rb').read()))
-BILOU.encode(train_words, 'gold_label')
-train_sentences = []
-word_index = 0
-while word_index < len(train_words):
-    sentence = train_words[word_index].sentence
-    train_sentences.append([(word_.text, word_.gold_label) for word_ in sentence])
-    word_index += len(sentence)
+TAG_SCHEME = BILOU
 
-dev_file_path = '/Users/konix/Workspace/nertagger/data/eng.testa'
-dev_words = parsed_documents_to_words(parse_conll_train(open(dev_file_path, 'rb').read()))
-BILOU.encode(dev_words, 'gold_label')
-dev_sentences = []
-word_index = 0
-while word_index < len(dev_words):
-    sentence = dev_words[word_index].sentence
-    dev_sentences.append([(word_.text, word_.gold_label) for word_ in sentence])
-    word_index += len(sentence)
 
-test_file_path = '/Users/konix/Workspace/nertagger/data/eng.testb'
-test_words = parsed_documents_to_words(parse_conll_train(open(test_file_path, 'rb').read()))
-BILOU.encode(test_words, 'gold_label')
-test_sentences = []
-word_index = 0
-while word_index < len(test_words):
-    sentence = test_words[word_index].sentence
-    test_sentences.append([(word_.text, word_.gold_label) for word_ in sentence])
-    word_index += len(sentence)
+train_words = parse_words(open(TRAIN_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
+train_sentences = split_words_to_sentences(train_words)
+dev_words = parse_words(open(DEV_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
+dev_sentences = split_words_to_sentences(dev_words)
+test_words = parse_words(open(TEST_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
+test_sentences = split_words_to_sentences(test_words)
 
-train = train_sentences
-test = dev_sentences
 
-words=[]
-tags=[]
-wc=Counter()
-for s in train:
-    for w,p in s:
-        words.append(w)
-        tags.append(p)
-        wc[w]+=1
-words.append("_UNK_")
-#words=[w if wc[w] > 1 else "_UNK_" for w in words]
-tags.append("_START_")
+word_list = []
+tag_list = []
+for sentence in train_sentences:
+    for (word_text, ner_tag) in sentence:
+        word_list.append(word_text)
+        tag_list.append(ner_tag)
 
-for s in test:
-    for w,p in s:
-        words.append(w)
 
-vw = util.Vocab.from_corpus([words])
-vt = util.Vocab.from_corpus([tags])
-UNK = vw.w2i["_UNK_"]
-
-nwords = vw.size()
-ntags  = vt.size()
-
-model = Model()
-sgd = SimpleSGDTrainer(model)
-
-model.add_lookup_parameters("lookup", (nwords, 300))
-model.add_lookup_parameters("tl", (ntags, 5))
-
-# My Code: initialize word lookup based on pre-trained embeddings
 embedding_by_word = {}
 for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.300d.txt', 'rb').readlines():
     word, embedding_str = line.split(' ', 1)
     embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
     embedding_by_word[word] = embedding
+
+
+word_counter = Counter(word_list)
+word_indexer = Indexer()
+word_indexer.index_object_list([word_text for (word_text, word_count) in word_counter.iteritems() if word_count >= 5])
+word_indexer.index_object_list(embedding_by_word.keys())
+unk_word_index = word_indexer.index_object('_UNK_')
+
+tag_counter = Counter(tag_list)
+tag_indexer = Indexer()
+tag_indexer.index_object_list(tag_counter.keys())
+tag_indexer.index_object('_START_')
+
+
+model = Model()
+sgd = SimpleSGDTrainer(model)
+
+model.add_lookup_parameters("lookup", (len(word_indexer), 300))
+model.add_lookup_parameters("tl", (len(tag_indexer), 8))
+
+# # My Code: initialize word lookup based on pre-trained embeddings
+# embedding_by_word = {}
+# for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.100d.txt', 'rb').readlines():
+#     word, embedding_str = line.split(' ', 1)
+#     embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
+#     embedding_by_word[word] = embedding
 word_lookup = model["lookup"]
-for idx in xrange(vw.size()):
-    word = vw.i2w[idx]
+for idx in xrange(len(word_indexer)):
+    word = word_indexer.get_object(idx)
     if word in embedding_by_word:
         word_lookup.init_row(idx, embedding_by_word[word])
 del embedding_by_word
 gc.collect()
 
-if MLP:
-    pH = model.add_parameters("HID", (32, 50*2))
-    pO = model.add_parameters("OUT", (ntags, 32))
-else:
-    pO = model.add_parameters("OUT", (ntags, 50*2))
+pH = model.add_parameters("HID", (32, 50*2))
+pO = model.add_parameters("OUT", (len(tag_indexer), 32))
 
 builders=[
         LSTMBuilder(1, 300, 50, model),
@@ -111,51 +92,42 @@ def build_tagging_graph(words, tags, model, builders):
     fw = [x.output() for x in f_init.add_inputs(wembs)]
     bw = [x.output() for x in b_init.add_inputs(reversed(wembs))]
 
-    if MLP:
-        H = parameter(pH)
-        O = parameter(pO)
-    else:
-        O = parameter(pO)
+    H = parameter(pH)
+    O = parameter(pO)
+
     errs = []
     for f,b,t in zip(fw, reversed(bw), tags):
         f_b = concatenate([f,b])
-        if MLP:
-            r_t = O*(tanh(H * f_b))
-        else:
-            r_t = O * f_b
+        r_t = O*(tanh(H * f_b))
         err = pickneglogsoftmax(r_t, t)
         errs.append(err)
     return esum(errs)
 
+
 def tag_sent(sent, model, builders):
     renew_cg()
     f_init, b_init = [b.initial_state() for b in builders]
-    wembs = [lookup(model["lookup"], vw.w2i.get(w, UNK)) for w,t in sent]
+    wembs = [lookup(model["lookup"], (word_indexer.get_index(w) or unk_word_index)) for w, t in sent]
 
     fw = [x.output() for x in f_init.add_inputs(wembs)]
     bw = [x.output() for x in b_init.add_inputs(reversed(wembs))]
 
-    if MLP:
-        H = parameter(pH)
-        O = parameter(pO)
-    else:
-        O = parameter(pO)
+    H = parameter(pH)
+    O = parameter(pO)
+
     tags=[]
-    for f,b,(w,t) in zip(fw,reversed(bw),sent):
-        if MLP:
-            r_t = O*(tanh(H * concatenate([f,b])))
-        else:
-            r_t = O*concatenate([f,b])
+    for f, b, (w, t) in zip(fw,reversed(bw),sent):
+        r_t = O*(tanh(H * concatenate([f, b])))
         out = softmax(r_t)
         chosen = np.argmax(out.npvalue())
-        tags.append(vt.i2w[chosen])
+        tags.append(tag_indexer.get_object(chosen))
     return tags
 
 
 tagged = loss = 0
 for ITER in xrange(5):
-    random.shuffle(train)
-    for i,s in enumerate(train,1):
+    random.shuffle(train_sentences)
+    for i,s in enumerate(train_sentences, 1):
         if i % 5000 == 0:
             sgd.status()
             print loss / tagged
@@ -163,15 +135,15 @@ for ITER in xrange(5):
             tagged = 0
         if i % 10000 == 0:
             good = bad = 0.0
-            for sent in test:
+            for sent in dev_sentences:
                 tags = tag_sent(sent, model, builders)
                 golds = [t for w,t in sent]
                 for go,gu in zip(golds,tags):
                     if go == gu: good +=1
                     else: bad+=1
             print good/(good+bad)
-        ws = [vw.w2i.get(w, UNK) for w,p in s]
-        ps = [vt.w2i[p] for w,p in s]
+        ws = [(word_indexer.get_index(w) or unk_word_index) for w,p in s]
+        ps = [tag_indexer.get_index(p) for w,p in s]
         sum_errs = build_tagging_graph(ws,ps,model,builders)
         squared = -sum_errs# * sum_errs
         loss += sum_errs.scalar_value()
@@ -190,11 +162,7 @@ while word_index < len(dev_words):
         word.tag = tag
 
     word_index += len(sentence)
-BILOU.decode(dev_words, 'gold_label')
-BILOU.decode(dev_words, 'tag')
-dev_text = format_conll_tagged(words_to_parsed_documents(dev_words))
-open('/tmp/dev_ner', 'wb').write(dev_text)
-
+format_words(open('/tmp/dev_ner', 'wb'), dev_words, tag_scheme=TAG_SCHEME)
 
 word_index = 0
 while word_index < len(test_words):
@@ -206,6 +174,4 @@ while word_index < len(test_words):
         word.tag = tag
 
     word_index += len(sentence)
-BILOU.decode(test_words, 'tag')
-test_text = format_conll_tagged(words_to_parsed_documents(test_words))
-open('/tmp/test_ner', 'wb').write(test_text)
+format_words(open('/tmp/test_ner', 'wb'), test_words, tag_scheme=TAG_SCHEME)
