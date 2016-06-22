@@ -25,9 +25,9 @@ TAG_SCHEME = BILOU
 
 class BiLstmNerTagger(object):
     WORD_DIM = 300
-    LSTM_DIM = 100
+    LSTM_DIM = 50
 
-    HIDDEN_DIM = 100
+    HIDDEN_DIM = 32
 
     def __init__(self, word_indexer, tag_indexer, external_word_embeddings=None):
         self.word_indexer = word_indexer
@@ -56,7 +56,7 @@ class BiLstmNerTagger(object):
         self.trainer = AdamTrainer(model)
         self.activation = tanh
 
-    def build_sentence_expressions(self, sentence):
+    def _build_sentence_expressions(self, sentence):
         lstm_forward = self.builders[0].initial_state()
         lstm_backward = self.builders[1].initial_state()
 
@@ -79,12 +79,12 @@ class BiLstmNerTagger(object):
             sentence_expressions.append(word_expression)
         return sentence_expressions
 
-    def _calc_sentence_error(self, sentence):
+    def calc_sentence_error(self, sentence):
         renew_cg()
 
         for word in sentence:
             word.vector = noise(self._get_word_vector(word), 0.1)
-        sentence_expressions = self.build_sentence_expressions(sentence)
+        sentence_expressions = self._build_sentence_expressions(sentence)
 
         sentence_errors = []
         for word, word_expression in zip(sentence, sentence_expressions):
@@ -92,6 +92,18 @@ class BiLstmNerTagger(object):
             word_error = pickneglogsoftmax(word_expression, gold_label_index)
             sentence_errors.append(word_error)
         return esum(sentence_errors)
+
+    def tag_sentence(self, sentence):
+        renew_cg()
+
+        for word in sentence:
+            word.vector = self._get_word_vector(word)
+
+        sentence_expressions = self._build_sentence_expressions(sentence)
+        for word, word_expression in zip(sentence, sentence_expressions):
+            out = softmax(word_expression)
+            tag_index = np.argmax(out.npvalue())
+            word.tag = self.tag_indexer.get_object(tag_index)
 
     def train(self, train_sentence_list, dev_sentence_list=None, iterations=5):
         loss = 0
@@ -118,23 +130,11 @@ class BiLstmNerTagger(object):
                                 bad += 1
                     print good / (good+bad)
 
-                sentence_error = self._calc_sentence_error(sentence)
+                sentence_error = self.calc_sentence_error(sentence)
                 loss += sentence_error.scalar_value()
                 tagged += len(sentence)
                 sentence_error.backward()
                 self.trainer.update()
-
-    def tag_sentence(self, sentence):
-        renew_cg()
-
-        for word in sentence:
-            word.vector = self._get_word_vector(word)
-
-        sentence_expressions = self.build_sentence_expressions(sentence)
-        for word, word_expression in zip(sentence, sentence_expressions):
-            out = softmax(word_expression)
-            tag_index = np.argmax(out.npvalue())
-            word.tag = self.tag_indexer.get_object(tag_index)
 
     def _get_word_vector(self, word):
         word_index = self.word_indexer.get_index(word.text) or self._unk_word_index
@@ -178,7 +178,7 @@ def main():
     del external_word_embeddings
     gc.collect()
 
-    tagger.train(train_sentences, dev_sentences, iterations=10)
+    tagger.train(train_sentences, dev_sentences)
 
     word_index = 0
     while word_index < len(dev_words):
