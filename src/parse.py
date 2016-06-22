@@ -19,7 +19,8 @@ def split_words_to_sentences(word_list):
         current_word = word_list[word_index]
         current_sentence = current_word.sentence
 
-        sentence_list.append([(word_.text, word_.gold_label) for word_ in current_sentence])
+        # sentence_list.append([(word_.text, word_.gold_label) for word_ in current_sentence])
+        sentence_list.append(current_sentence)
         word_index += len(current_sentence)
     return sentence_list
 
