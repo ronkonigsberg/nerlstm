@@ -138,8 +138,11 @@ class BiLstmNerTagger(object):
                 eval_ner(dev_sentence_list)
 
     def _get_word_vector(self, word):
-        word_index = self.word_indexer.get_index(word.text) or self._unk_word_index
-        word_embedding = lookup(self.model["word_lookup"], word_index)
+        if word is None:
+            word_index = self._unk_word_index
+        else:
+            word_index = self.word_indexer.get_index(word.text) or self._unk_word_index
+        return lookup(self.model["word_lookup"], word_index)
 
 
 def eval_ner(test_sentence_list):
