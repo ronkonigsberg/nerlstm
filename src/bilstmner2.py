@@ -1,6 +1,8 @@
+import os
 import gc
 import random
 from collections import Counter
+from tempfile import NamedTemporaryFile
 
 import numpy as np
 from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, noise, parameter, concatenate,
