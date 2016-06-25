@@ -29,9 +29,9 @@ TAG_SCHEME = BILOU
 
 class BiLstmNerTagger(object):
     WORD_DIM = 300
-    LSTM_DIM = 50
+    LSTM_DIM = 100
 
-    HIDDEN_DIM = 32
+    HIDDEN_DIM = 150
 
     def __init__(self, word_indexer, tag_indexer, external_word_embeddings=None):
         self.word_indexer = word_indexer
