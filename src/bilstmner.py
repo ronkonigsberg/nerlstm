@@ -11,6 +11,9 @@ from parse import parse_words, split_words_to_sentences, format_words
 from indexer import Indexer
 
 
+random.seed(1)
+
+
 TRAIN_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.train'
 DEV_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testa'
 TEST_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testb'
@@ -55,10 +58,10 @@ tag_indexer.index_object('_START_')
 
 
 model = Model()
-sgd = SimpleSGDTrainer(model)
+sgd = AdamTrainer(model)
 
 model.add_lookup_parameters("lookup", (len(word_indexer), 300))
-model.add_lookup_parameters("tl", (len(tag_indexer), 8))
+# model.add_lookup_parameters("tl", (len(tag_indexer), 8))
 
 # # My Code: initialize word lookup based on pre-trained embeddings
 # embedding_by_word = {}
@@ -145,7 +148,6 @@ for ITER in xrange(5):
         ws = [(word_indexer.get_index(w) or unk_word_index) for w,p in s]
         ps = [tag_indexer.get_index(p) for w,p in s]
         sum_errs = build_tagging_graph(ws,ps,model,builders)
-        squared = -sum_errs# * sum_errs
         loss += sum_errs.scalar_value()
         tagged += len(ps)
         sum_errs.backward()
