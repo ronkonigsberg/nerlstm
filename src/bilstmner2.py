@@ -108,29 +108,29 @@ class BiLstmNerTagger(object):
             word.tag = self.tag_indexer.get_object(tag_index)
 
     def train(self, train_sentence_list, dev_sentence_list=None, iterations=5):
-        loss = 0
-        tagged = 0
-
         train_sentence_list = list(train_sentence_list)
-        for _ in xrange(iterations):
+
+        loss = tagged = 0
+        for iteration_idx in xrange(1, iterations+1):
+            print "Starting training iteration %d" % iteration_idx
             random.shuffle(train_sentence_list)
             for sentence_index, sentence in enumerate(train_sentence_list, 1):
-                if sentence_index % 5000 == 0:
-                    self.trainer.status()
-                    print loss / tagged
-                    loss = 0
-                    tagged = 0
-
-                if sentence_index % 10000 == 0 and dev_sentence_list:
-                    for dev_sentence in dev_sentence_list:
-                        self.tag_sentence(dev_sentence)
-                    eval_ner(dev_sentence_list)
-
                 sentence_error = self.calc_sentence_error(sentence)
                 loss += sentence_error.scalar_value()
                 tagged += len(sentence)
                 sentence_error.backward()
                 self.trainer.update()
+
+            # Trainer Status
+            self.trainer.status()
+            print loss / tagged
+            loss = tagged = 0
+
+            if dev_sentence_list:
+                # Dev Evaluation
+                for dev_sentence in dev_sentence_list:
+                    self.tag_sentence(dev_sentence)
+                eval_ner(dev_sentence_list)
 
     def _get_word_vector(self, word):
         word_index = self.word_indexer.get_index(word.text) or self._unk_word_index
