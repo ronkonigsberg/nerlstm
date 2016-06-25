@@ -15,6 +15,8 @@ from indexer import Indexer
 random.seed(1)
 
 
+EVAL_NER_CMD = '/Users/konix/Workspace/nertagger/src/conlleval < {test_file}'
+
 TRAIN_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.train'
 DEV_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testa'
 TEST_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testb'
@@ -120,15 +122,9 @@ class BiLstmNerTagger(object):
                     tagged = 0
 
                 if sentence_index % 10000 == 0 and dev_sentence_list:
-                    good = bad = 0.0
                     for dev_sentence in dev_sentence_list:
                         self.tag_sentence(dev_sentence)
-                        for word in dev_sentence:
-                            if word.tag == word.gold_label:
-                                good += 1
-                            else:
-                                bad += 1
-                    print good / (good+bad)
+                    eval_ner(dev_sentence_list)
 
                 sentence_error = self.calc_sentence_error(sentence)
                 loss += sentence_error.scalar_value()
@@ -140,7 +136,16 @@ class BiLstmNerTagger(object):
         word_index = self.word_indexer.get_index(word.text) or self._unk_word_index
         word_embedding = lookup(self.model["word_lookup"], word_index)
 
-        return word_embedding
+
+def eval_ner(test_sentence_list):
+    test_words = []
+    for sentence in test_sentence_list:
+        test_words.extend(sentence)
+
+    with NamedTemporaryFile(mode='wb') as temp_file:
+        format_words(temp_file, test_words, tag_scheme=TAG_SCHEME)
+        temp_file.flush()
+        os.system(EVAL_NER_CMD.format(test_file=temp_file.name))
 
 
 def main():
