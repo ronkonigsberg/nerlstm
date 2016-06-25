@@ -87,7 +87,10 @@ class BiLstmNerTagger(object):
         renew_cg()
 
         for word in sentence:
-            word.vector = noise(self._get_word_vector(word), 0.1)
+            # word.vector = noise(self._get_word_vector(word), 0.1)
+
+            should_drop = random.random() < 0.3
+            word.vector = self._get_word_vector(word) if not should_drop else self._get_word_vector(None)
         sentence_expressions = self._build_sentence_expressions(sentence)
 
         sentence_errors = []
