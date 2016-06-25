@@ -175,7 +175,9 @@ def main():
 
     word_counter = Counter(word_list)
     word_indexer = Indexer()
-    word_indexer.index_object_list([word_text for (word_text, word_count) in word_counter.iteritems() if word_count >= 5])
+    word_indexer.index_object_list(
+        [word_text for (word_text, word_count) in word_counter.iteritems() if word_count >= 1]
+    )
     word_indexer.index_object_list(external_word_embeddings.keys())
     word_indexer.index_object('_UNK_')
 
