@@ -175,8 +175,8 @@ def main():
         for word_ in sentence_:
             word_list.append(word_.text)
             tag_list.append(word_.gold_label)
-
     word_counter = Counter(word_list)
+
     word_indexer = Indexer()
     word_indexer.index_object_list(
         [word_text for (word_text, word_count) in word_counter.iteritems() if word_count >= 1]
