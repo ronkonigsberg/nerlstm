@@ -28,7 +28,7 @@ TAG_SCHEME = BILOU
 
 
 class BiLstmNerTagger(object):
-    WORD_DIM = 300
+    WORD_DIM = 100
     LSTM_DIM = 100
 
     HIDDEN_DIM = 150
@@ -164,7 +164,7 @@ def main():
     test_words = parse_words(open(TEST_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
 
     external_word_embeddings = {}
-    for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.300d.txt', 'rb').readlines():
+    for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.100d.txt', 'rb').readlines():
         word, embedding_str = line.split(' ', 1)
         embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
         external_word_embeddings[word] = embedding
