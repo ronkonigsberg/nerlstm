@@ -174,13 +174,13 @@ def main():
     tag_list = []
     for sentence_ in train_sentences:
         for word_ in sentence_:
-            word_list.append(word_.text)
+            word_list.append(word_.text.lower())
             tag_list.append(word_.gold_label)
     word_counter = Counter(word_list)
 
     word_indexer = Indexer()
     word_indexer.index_object_list(
-        [word_text.lower() for (word_text, word_count) in word_counter.iteritems() if word_count >= 1]
+        [word_text for (word_text, word_count) in word_counter.iteritems() if word_count >= 1]
     )
     word_indexer.index_object_list(external_word_embeddings.keys())
     word_indexer.index_object('_UNK_')
