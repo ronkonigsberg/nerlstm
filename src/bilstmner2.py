@@ -29,17 +29,20 @@ TAG_SCHEME = BILOU
 
 class BiLstmNerTagger(object):
     WORD_DIM = 100
+    CHAR_DIM = 25
     LSTM_DIM = 100
 
     HIDDEN_DIM = 150
 
-    def __init__(self, word_indexer, tag_indexer, external_word_embeddings=None):
+    def __init__(self, word_indexer, char_indexer, tag_indexer, external_word_embeddings=None):
         self.word_indexer = word_indexer
         self._unk_word_index = word_indexer.index_object('_UNK_')
+        self.char_indexer = char_indexer
         self.tag_indexer = tag_indexer
 
         model = Model()
         model.add_lookup_parameters("word_lookup", (len(word_indexer), self.WORD_DIM))
+        model.add_lookup_parameters("char_lookup", (len(char_indexer), self.CHAR_DIM))
 
         if external_word_embeddings:
             word_lookup = model["word_lookup"]
@@ -51,9 +54,14 @@ class BiLstmNerTagger(object):
         self.param_hidden = model.add_parameters("HID", (self.HIDDEN_DIM, self.LSTM_DIM*2))
         self.param_out = model.add_parameters("OUT", (len(tag_indexer), self.HIDDEN_DIM))
 
-        self.builders = [
-            LSTMBuilder(1, self.WORD_DIM, self.LSTM_DIM, model),
-            LSTMBuilder(1, self.WORD_DIM, self.LSTM_DIM, model)
+        self.char_builders = [
+            LSTMBuilder(1, self.CHAR_DIM, self.CHAR_DIM, model),
+            LSTMBuilder(1, self.CHAR_DIM, self.CHAR_DIM, model)
+        ]
+
+        self.word_builders = [
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model),
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model)
         ]
 
         self.model = model
@@ -61,8 +69,8 @@ class BiLstmNerTagger(object):
         self.activation = tanh
 
     def _build_sentence_expressions(self, sentence):
-        lstm_forward = self.builders[0].initial_state()
-        lstm_backward = self.builders[1].initial_state()
+        lstm_forward = self.word_builders[0].initial_state()
+        lstm_backward = self.word_builders[1].initial_state()
 
         embeddings_forward = []
         embeddings_backward = []
@@ -90,7 +98,7 @@ class BiLstmNerTagger(object):
             # word.vector = noise(self._get_word_vector(word), 0.1)
 
             should_drop = random.random() < 0.5
-            word.vector = self._get_word_vector(word) if not should_drop else self._get_word_vector(None)
+            word.vector = self._get_word_vector(word, dropout=should_drop)
         sentence_expressions = self._build_sentence_expressions(sentence)
 
         sentence_errors = []
@@ -137,12 +145,34 @@ class BiLstmNerTagger(object):
                     self.tag_sentence(dev_sentence)
                 eval_ner(dev_sentence_list)
 
-    def _get_word_vector(self, word):
+    def _get_word_vector(self, word, dropout=False):
+        word_embedding = self._get_word_embedding(word) if not dropout else self._get_word_embedding(None)
+        char_representation = self._get_char_representation(word)
+        return concatenate([word_embedding, char_representation])
+
+    def _get_word_embedding(self, word):
         if word is None:
             word_index = self._unk_word_index
         else:
             word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index
         return lookup(self.model["word_lookup"], word_index)
+
+    def _get_char_representation(self, word):
+        word_char_vectors = []
+        for char in word.text:
+            char_index = self.char_indexer.get_index(char)
+            if char_index is None:
+                raise RuntimeError("Unexpected char '%s' (word='%s')" % (char, word.text))
+            char_vector = lookup(self.model["char_lookup"], char_index)
+            word_char_vectors.append(char_vector)
+
+        lstm_forward = self.char_builders[0].initial_state()
+        lstm_backward = self.char_builders[1].initial_state()
+
+        for char_vector, reverse_char_vector in zip(word_char_vectors, reversed(word_char_vectors)):
+            lstm_forward = lstm_forward.add_input(char_vector)
+            lstm_backward = lstm_backward.add_input(reverse_char_vector)
+        return concatenate([lstm_forward.output(), lstm_backward.output()])
 
 
 def eval_ner(test_sentence_list):
@@ -195,7 +225,7 @@ def main():
     tag_indexer = Indexer()
     tag_indexer.index_object_list(tag_counter.keys())
 
-    tagger = BiLstmNerTagger(word_indexer, tag_indexer, external_word_embeddings)
+    tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, external_word_embeddings)
 
     del word_list
     del char_list
