@@ -171,13 +171,15 @@ def main():
         external_word_embeddings[word] = embedding
 
     word_list = []
+    char_list = []
     tag_list = []
     for sentence_ in train_sentences:
         for word_ in sentence_:
             word_list.append(word_.text.lower())
             tag_list.append(word_.gold_label)
-    word_counter = Counter(word_list)
+            char_list.extend(word_.text)
 
+    word_counter = Counter(word_list)
     word_indexer = Indexer()
     word_indexer.index_object_list(
         [word_text for (word_text, word_count) in word_counter.iteritems() if word_count >= 1]
@@ -185,12 +187,19 @@ def main():
     word_indexer.index_object_list(external_word_embeddings.keys())
     word_indexer.index_object('_UNK_')
 
+    char_counter = Counter(char_list)
+    char_indexer = Indexer()
+    char_indexer.index_object_list(char_counter.keys())
+
     tag_counter = Counter(tag_list)
     tag_indexer = Indexer()
     tag_indexer.index_object_list(tag_counter.keys())
 
     tagger = BiLstmNerTagger(word_indexer, tag_indexer, external_word_embeddings)
 
+    del word_list
+    del char_list
+    del tag_list
     del external_word_embeddings
     gc.collect()
 
