@@ -141,7 +141,7 @@ class BiLstmNerTagger(object):
         if word is None:
             word_index = self._unk_word_index
         else:
-            word_index = self.word_indexer.get_index(word.text) or self._unk_word_index
+            word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index
         return lookup(self.model["word_lookup"], word_index)
 
 
@@ -149,6 +149,7 @@ def eval_ner(test_sentence_list):
     test_words = []
     for sentence in test_sentence_list:
         test_words.extend(sentence)
+
 
     with NamedTemporaryFile(mode='wb') as temp_file:
         format_words(temp_file, test_words, tag_scheme=TAG_SCHEME)
@@ -179,7 +180,7 @@ def main():
 
     word_indexer = Indexer()
     word_indexer.index_object_list(
-        [word_text for (word_text, word_count) in word_counter.iteritems() if word_count >= 1]
+        [word_text.lower() for (word_text, word_count) in word_counter.iteritems() if word_count >= 1]
     )
     word_indexer.index_object_list(external_word_embeddings.keys())
     word_indexer.index_object('_UNK_')
