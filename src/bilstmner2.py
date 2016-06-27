@@ -117,7 +117,7 @@ class BiLstmNerTagger(object):
 
         loss = tagged = 0
         for iteration_idx in xrange(1, iterations+1):
-            print "Starting training iteration %d" % iteration_idx
+            print "Starting training iteration %d/%d" % (iteration_idx, iterations)
             random.shuffle(train_sentence_list)
             for sentence_index, sentence in enumerate(train_sentence_list, 1):
                 sentence_error = self.calc_sentence_error(sentence)
@@ -194,7 +194,7 @@ def main():
     del external_word_embeddings
     gc.collect()
 
-    tagger.train(train_sentences, dev_sentences)
+    tagger.train(train_sentences, dev_sentences, iterations=50)
 
     word_index = 0
     while word_index < len(dev_words):
