@@ -159,7 +159,8 @@ class BiLstmNerTagger(object):
         for char in word.text:
             char_index = self.char_indexer.get_index(char)
             if char_index is None:
-                raise RuntimeError("Unexpected char '%s' (word='%s')" % (char, word.text))
+                print "Warning: Unexpected char '%s' (word='%s')" % (char, word.text)
+                continue
             char_vector = lookup(self.model["char_lookup"], char_index)
             word_char_vectors.append(char_vector)
 
