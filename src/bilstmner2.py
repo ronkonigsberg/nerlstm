@@ -96,9 +96,7 @@ class BiLstmNerTagger(object):
 
         for word in sentence:
             # word.vector = noise(self._get_word_vector(word), 0.1)
-
-            should_drop = random.random() < 0.5
-            word.vector = self._get_word_vector(word, dropout=should_drop)
+            word.vector = self._get_word_vector(word, use_dropout=True)
         sentence_expressions = self._build_sentence_expressions(sentence)
 
         sentence_errors = []
@@ -112,7 +110,7 @@ class BiLstmNerTagger(object):
         renew_cg()
 
         for word in sentence:
-            word.vector = self._get_word_vector(word)
+            word.vector = self._get_word_vector(word, use_dropout=False)
 
         sentence_expressions = self._build_sentence_expressions(sentence)
         for word, word_expression in zip(sentence, sentence_expressions):
@@ -145,19 +143,18 @@ class BiLstmNerTagger(object):
                     self.tag_sentence(dev_sentence)
                 eval_ner(dev_sentence_list)
 
-    def _get_word_vector(self, word, dropout=False):
-        word_embedding = self._get_word_embedding(word) if not dropout else self._get_word_embedding(None)
-        char_representation = self._get_char_representation(word)
+    def _get_word_vector(self, word, use_dropout=False):
+        word_embedding = self._get_word_embedding(word, use_dropout)
+        char_representation = self._get_char_representation(word, use_dropout)
         return concatenate([word_embedding, char_representation])
 
-    def _get_word_embedding(self, word):
-        if word is None:
+    def _get_word_embedding(self, word, use_dropout):
+        word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index
+        if use_dropout and random.random() < 0.5:
             word_index = self._unk_word_index
-        else:
-            word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index
         return lookup(self.model["word_lookup"], word_index)
 
-    def _get_char_representation(self, word):
+    def _get_char_representation(self, word, use_dropout):
         word_char_vectors = []
         for char in word.text:
             char_index = self.char_indexer.get_index(char)
