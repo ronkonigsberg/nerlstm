@@ -68,15 +68,22 @@ class BiLstmNerTagger(object):
         self.trainer = AdamTrainer(model)
         self.activation = tanh
 
-    def _build_sentence_expressions(self, sentence):
+    def _build_sentence_expressions(self, sentence, use_dropout=False):
+        renew_cg()
+
+        sentence_word_vectors = []
+        for word in sentence:
+            # word.vector = noise(self._get_word_vector(word), 0.1)
+            sentence_word_vectors.append(self._get_word_vector(word, use_dropout=use_dropout))
+
         lstm_forward = self.word_builders[0].initial_state()
         lstm_backward = self.word_builders[1].initial_state()
 
         embeddings_forward = []
         embeddings_backward = []
-        for word, reverse_word in zip(sentence, reversed(sentence)):
-            lstm_forward = lstm_forward.add_input(word.vector)
-            lstm_backward = lstm_backward.add_input(reverse_word.vector)
+        for word_vector, reverse_word_vector in zip(sentence_word_vectors, reversed(sentence_word_vectors)):
+            lstm_forward = lstm_forward.add_input(word_vector)
+            lstm_backward = lstm_backward.add_input(reverse_word_vector)
 
             embeddings_forward.append(lstm_forward.output())
             embeddings_backward.append(lstm_backward.output())
@@ -92,12 +99,7 @@ class BiLstmNerTagger(object):
         return sentence_expressions
 
     def calc_sentence_error(self, sentence):
-        renew_cg()
-
-        for word in sentence:
-            # word.vector = noise(self._get_word_vector(word), 0.1)
-            word.vector = self._get_word_vector(word, use_dropout=True)
-        sentence_expressions = self._build_sentence_expressions(sentence)
+        sentence_expressions = self._build_sentence_expressions(sentence, use_dropout=True)
 
         sentence_errors = []
         for word, word_expression in zip(sentence, sentence_expressions):
@@ -107,12 +109,7 @@ class BiLstmNerTagger(object):
         return esum(sentence_errors)
 
     def tag_sentence(self, sentence):
-        renew_cg()
-
-        for word in sentence:
-            word.vector = self._get_word_vector(word, use_dropout=False)
-
-        sentence_expressions = self._build_sentence_expressions(sentence)
+        sentence_expressions = self._build_sentence_expressions(sentence, use_dropout=False)
         for word, word_expression in zip(sentence, sentence_expressions):
             out = softmax(word_expression)
             tag_index = np.argmax(out.npvalue())
