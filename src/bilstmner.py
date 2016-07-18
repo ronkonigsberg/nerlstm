@@ -5,7 +5,7 @@ from collections import Counter
 from tempfile import NamedTemporaryFile
 
 import numpy as np
-from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, noise, parameter, concatenate,
+from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, dropout, parameter, concatenate,
                    tanh, softmax, pickneglogsoftmax, esum)
 
 from nertagger.tag_scheme import BILOU
@@ -68,13 +68,12 @@ class BiLstmNerTagger(object):
         self.trainer = AdamTrainer(model)
         self.activation = tanh
 
-    def _build_sentence_expressions(self, sentence, use_dropout=False):
+    def _build_sentence_expressions(self, sentence, is_train=False):
         renew_cg()
 
         sentence_word_vectors = []
         for word in sentence:
-            # word.vector = noise(self._get_word_vector(word), 0.1)
-            sentence_word_vectors.append(self._get_word_vector(word, use_dropout=use_dropout))
+            sentence_word_vectors.append(self._get_word_vector(word, use_dropout=is_train))
 
         lstm_forward = self.word_builders[0].initial_state()
         lstm_backward = self.word_builders[1].initial_state()
@@ -99,7 +98,7 @@ class BiLstmNerTagger(object):
         return sentence_expressions
 
     def calc_sentence_error(self, sentence):
-        sentence_expressions = self._build_sentence_expressions(sentence, use_dropout=True)
+        sentence_expressions = self._build_sentence_expressions(sentence, is_train=False)
 
         sentence_errors = []
         for word, word_expression in zip(sentence, sentence_expressions):
@@ -109,7 +108,7 @@ class BiLstmNerTagger(object):
         return esum(sentence_errors)
 
     def tag_sentence(self, sentence):
-        sentence_expressions = self._build_sentence_expressions(sentence, use_dropout=False)
+        sentence_expressions = self._build_sentence_expressions(sentence, is_train=False)
         for word, word_expression in zip(sentence, sentence_expressions):
             out = softmax(word_expression)
             tag_index = np.argmax(out.npvalue())
@@ -142,7 +141,7 @@ class BiLstmNerTagger(object):
 
     def _get_word_vector(self, word, use_dropout=False):
         word_embedding = self._get_word_embedding(word, use_dropout)
-        char_representation = self._get_char_representation(word, use_dropout)
+        char_representation = self._get_char_representation(word)
         return concatenate([word_embedding, char_representation])
 
     def _get_word_embedding(self, word, use_dropout):
@@ -151,7 +150,7 @@ class BiLstmNerTagger(object):
             word_index = self._unk_word_index
         return lookup(self.model["word_lookup"], word_index)
 
-    def _get_char_representation(self, word, use_dropout):
+    def _get_char_representation(self, word):
         word_char_vectors = []
         for char in word.text:
             char_index = self.char_indexer.get_index(char)
