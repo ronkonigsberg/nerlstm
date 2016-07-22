@@ -140,14 +140,12 @@ class BiLstmNerTagger(object):
                 eval_ner(dev_sentence_list)
 
     def _get_word_vector(self, word, use_dropout=False):
-        word_embedding = self._get_word_embedding(word, use_dropout)
+        word_embedding = self._get_word_embedding(word)
         char_representation = self._get_char_representation(word)
         return concatenate([word_embedding, char_representation])
 
-    def _get_word_embedding(self, word, use_dropout):
+    def _get_word_embedding(self, word):
         word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index
-        if use_dropout and random.random() < 0.5:
-            word_index = self._unk_word_index
         return lookup(self.model["word_lookup"], word_index)
 
     def _get_char_representation(self, word):
