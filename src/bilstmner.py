@@ -142,7 +142,11 @@ class BiLstmNerTagger(object):
     def _get_word_vector(self, word, use_dropout=False):
         word_embedding = self._get_word_embedding(word)
         char_representation = self._get_char_representation(word)
-        return concatenate([word_embedding, char_representation])
+
+        word_vector = concatenate([word_embedding, char_representation])
+        if use_dropout:
+            word_vector = dropout(word_vector, 0.5)
+        return word_vector
 
     def _get_word_embedding(self, word):
         word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index
