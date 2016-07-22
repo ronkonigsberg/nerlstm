@@ -93,7 +93,13 @@ class BiLstmNerTagger(object):
         sentence_expressions = []
         for word_f_embedding, word_b_embedding in zip(embeddings_forward, reversed(embeddings_backward)):
             word_concat_embedding = concatenate([word_f_embedding, word_b_embedding])
-            word_expression = O * self.activation(H * word_concat_embedding)
+            # word_expression = O * self.activation(H * word_concat_embedding)
+            if is_train:
+                calculated_hidden = dropout(self.activation(H * word_concat_embedding), 0.5)
+            else:
+                calculated_hidden = self.activation(H * word_concat_embedding) / 2
+            word_expression = O * calculated_hidden
+
             sentence_expressions.append(word_expression)
         return sentence_expressions
 
