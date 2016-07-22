@@ -98,7 +98,7 @@ class BiLstmNerTagger(object):
         return sentence_expressions
 
     def calc_sentence_error(self, sentence):
-        sentence_expressions = self._build_sentence_expressions(sentence, is_train=False)
+        sentence_expressions = self._build_sentence_expressions(sentence, is_train=True)
 
         sentence_errors = []
         for word, word_expression in zip(sentence, sentence_expressions):
