@@ -51,8 +51,7 @@ class BiLstmNerTagger(object):
                 if word in external_word_embeddings:
                     word_lookup.init_row(idx, external_word_embeddings[word])
 
-        self.param_hidden = model.add_parameters("HID", (self.HIDDEN_DIM, self.LSTM_DIM*2))
-        self.param_out = model.add_parameters("OUT", (len(tag_indexer), self.HIDDEN_DIM))
+        self.param_out = model.add_parameters("OUT", (len(tag_indexer), self.LSTM_DIM*2))
 
         self.char_builders = [
             LSTMBuilder(1, self.CHAR_DIM, self.CHAR_DIM, model),
@@ -66,7 +65,6 @@ class BiLstmNerTagger(object):
 
         self.model = model
         self.trainer = AdamTrainer(model)
-        self.activation = tanh
 
     def _build_sentence_expressions(self, sentence, is_train=False):
         renew_cg()
@@ -87,19 +85,13 @@ class BiLstmNerTagger(object):
             embeddings_forward.append(lstm_forward.output())
             embeddings_backward.append(lstm_backward.output())
 
-        H = parameter(self.param_hidden)
         O = parameter(self.param_out)
 
         sentence_expressions = []
         for word_f_embedding, word_b_embedding in zip(embeddings_forward, reversed(embeddings_backward)):
             word_concat_embedding = concatenate([word_f_embedding, word_b_embedding])
-            # word_expression = O * self.activation(H * word_concat_embedding)
-            if is_train:
-                calculated_hidden = dropout(self.activation(H * word_concat_embedding), 0.5)
-            else:
-                calculated_hidden = self.activation(H * word_concat_embedding) / 2
-            word_expression = O * calculated_hidden
 
+            word_expression = O * word_concat_embedding
             sentence_expressions.append(word_expression)
         return sentence_expressions
 
