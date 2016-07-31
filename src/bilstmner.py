@@ -112,7 +112,7 @@ class BiLstmNerTagger(object):
             tag_index = np.argmax(out.npvalue())
             word.tag = self.tag_indexer.get_object(tag_index)
 
-    def train(self, train_sentence_list, dev_sentence_list=None, iterations=5):
+    def train(self, train_sentence_list, dev_sentence_list=None, test_sentence_list=None, iterations=5):
         train_sentence_list = list(train_sentence_list)
 
         loss = tagged = 0
@@ -136,6 +136,12 @@ class BiLstmNerTagger(object):
                 for dev_sentence in dev_sentence_list:
                     self.tag_sentence(dev_sentence)
                 eval_ner(dev_sentence_list)
+
+            if test_sentence_list:
+                # Test Evaluation
+                for test_sentence in test_sentence_list:
+                    self.tag_sentence(test_sentence)
+                eval_ner(test_sentence_list)
 
     def _get_word_vector(self, word, use_dropout=False):
         word_embedding = self._get_word_embedding(word)
@@ -187,6 +193,7 @@ def main():
     dev_words = parse_words(open(DEV_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
     dev_sentences = split_words_to_sentences(dev_words)
     test_words = parse_words(open(TEST_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
+    test_sentences = split_words_to_sentences(test_words)
 
     external_word_embeddings = {}
     for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.100d.txt', 'rb').readlines():
@@ -227,7 +234,7 @@ def main():
     del external_word_embeddings
     gc.collect()
 
-    tagger.train(train_sentences, dev_sentences, iterations=26)
+    tagger.train(train_sentences, dev_sentences, test_sentences, iterations=15)
 
     word_index = 0
     while word_index < len(dev_words):
