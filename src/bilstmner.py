@@ -180,7 +180,6 @@ def eval_ner(test_sentence_list):
     for sentence in test_sentence_list:
         test_words.extend(sentence)
 
-
     with NamedTemporaryFile(mode='wb') as temp_file:
         format_words(temp_file, test_words, tag_scheme=TAG_SCHEME)
         temp_file.flush()
