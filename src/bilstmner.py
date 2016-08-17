@@ -118,23 +118,21 @@ class BiLstmNerTagger(object):
         output_expr, _ = self.decode_sentence_tags_by_viterbi(word_expression_list, transition_matrix)
         return exp(output_expr - gold_expr)
 
-    def _get_gold_expression(self, sentence, sentence_expressions, transition_matrix):
+    def _get_gold_expression(self, sentence, word_expression_list, transition_matrix):
         prev_gold_tag_index = self.start_tag_index
         sentence_expr = None
-        for word, word_expression in zip(sentence, sentence_expressions):
+        for word, word_expression in zip(sentence, word_expression_list):
             cur_gold_tag_index = self.tag_indexer.get_index(word.gold_label)
             transition_expr = self._get_transition_expr(transition_matrix, prev_gold_tag_index, cur_gold_tag_index)
             cur_tag_expr = word_expression[cur_gold_tag_index]
 
-            if sentence_expr is None:
-                sentence_expr = transition_expr + cur_tag_expr
-            else:
-                sentence_expr = sentence_expr + transition_expr + cur_tag_expr
+            sentence_expr = ((sentence_expr + transition_expr + cur_tag_expr) if sentence_expr is not None else
+                             (transition_expr + cur_tag_expr))
 
             prev_gold_tag_index = cur_gold_tag_index
 
         final_transition_expr = self._get_transition_expr(transition_matrix, prev_gold_tag_index, self.end_tag_index)
-        sentence_expr = sentence_expr + final_transition_expr if sentence_expr is not None else final_transition_expr
+        sentence_expr = (sentence_expr + final_transition_expr) if sentence_expr is not None else final_transition_expr
         return sentence_expr
 
     def tag_sentence_viterbi(self, sentence):
