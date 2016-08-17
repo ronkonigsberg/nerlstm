@@ -144,10 +144,10 @@ class BiLstmNerTagger(object):
         for word, word_tag in zip(sentence, sentence_tags):
             word.tag = word_tag
 
-    def decode_sentence_tags_by_viterbi(self, sentence_expressions, transition_matrix):
+    def decode_sentence_tags_by_viterbi(self, word_expression_list, transition_matrix):
         cur_viterbi_dict = {self.start_tag_index: (None, None)}
         bp = {}
-        for word_index, word_expression in enumerate(sentence_expressions):
+        for word_index, word_expression in enumerate(word_expression_list):
             prev_viterbi_dict = cur_viterbi_dict
             cur_viterbi_dict = {}
             for prev_tag_index, (prev_tag_expr, prev_tag_score) in prev_viterbi_dict.iteritems():
@@ -174,11 +174,11 @@ class BiLstmNerTagger(object):
             if best_viterbi_score is None or best_viterbi_score < final_score:
                 best_viterbi_score = final_score
                 best_score_expression = final_expr
-                bp[(len(sentence_expressions), end_tag_index)] = last_tag_index
+                bp[(len(word_expression_list), end_tag_index)] = last_tag_index
 
         best_expression_sentence_tags = []
         cur_tag_index = end_tag_index
-        for idx in xrange(len(sentence_expressions), 0, -1):
+        for idx in xrange(len(word_expression_list), 0, -1):
             prev_tag_index = bp[(idx, cur_tag_index)]
             best_expression_sentence_tags.insert(0, self.tag_indexer.get_object(prev_tag_index))
             cur_tag_index = prev_tag_index
