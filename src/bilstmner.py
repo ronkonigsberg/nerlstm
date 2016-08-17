@@ -229,9 +229,9 @@ class BiLstmNerTagger(object):
 
     def logadd_expr(self, expr1, expr2):
         if (expr1.npvalue() - expr2.npvalue()) > 0:
-            return expr1 + log(exp(expr2 - expr1))
+            return expr1 + log(exp(expr2 - expr1) + 1)
         else:
-            return expr2 + log(exp(expr1 - expr2))
+            return expr2 + log(exp(expr1 - expr2) + 1)
 
     def tag_sentence(self, sentence):
         word_expression_list = self._build_word_expression_list(sentence, is_train=False)
