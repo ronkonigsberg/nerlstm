@@ -115,6 +115,44 @@ class BiLstmNerTagger(object):
         transition_matrix = parameter(self.param_transition)
 
         gold_expr = self._get_gold_expression(sentence, word_expression_list, transition_matrix)
+        all_sequence_expr = self._get_all_sequence_expr(word_expression_list, transition_matrix)
+        return gold_expr - all_sequence_expr
+
+    def _get_all_sequence_expr(self, word_expression_list, transition_matrix):
+        cur_viterbi_dict = {self.start_tag_index: None}
+        for word_index, word_expression in enumerate(word_expression_list):
+            prev_viterbi_dict = cur_viterbi_dict
+            cur_viterbi_dict = {}
+            for prev_tag_index, prev_tag_expr in prev_viterbi_dict.iteritems():
+                for cur_tag_index in xrange(self.word_tag_count):
+                    cur_tag_expr = word_expression[cur_tag_index]
+                    transition_expr = self._get_transition_expr(transition_matrix, prev_tag_index, cur_tag_index)
+
+                    bigram_expr = ((prev_tag_expr * exp(transition_expr + cur_tag_expr)) if prev_tag_expr is not None
+                                   else exp(transition_expr + cur_tag_expr))
+
+                    if cur_tag_index not in cur_viterbi_dict:
+                        cur_viterbi_dict[cur_tag_index] = bigram_expr
+                    else:
+                        cur_viterbi_dict[cur_tag_index] = cur_viterbi_dict[cur_tag_index] + bigram_expr
+
+        end_tag_index = self.end_tag_index
+        all_sequence_expr = None
+        for last_tag_index, last_tag_expr in cur_viterbi_dict.iteritems():
+            transition_expr = self._get_transition_expr(transition_matrix, last_tag_index, end_tag_index)
+            final_expr = (last_tag_expr * exp(transition_expr)) if last_tag_expr is not None else exp(transition_expr)
+
+            if all_sequence_expr is None:
+                all_sequence_expr = final_expr
+            else:
+                all_sequence_expr = all_sequence_expr + final_expr
+        return log(all_sequence_expr)
+
+    def calc_sentence_error_semi_viterbi(self, sentence):
+        word_expression_list = self._build_word_expression_list(sentence, is_train=True)
+        transition_matrix = parameter(self.param_transition)
+
+        gold_expr = self._get_gold_expression(sentence, word_expression_list, transition_matrix)
         output_expr, _ = self.decode_sentence_tags_by_viterbi(word_expression_list, transition_matrix)
         return exp(output_expr - gold_expr)
 
