@@ -71,7 +71,7 @@ class BiLstmNerTagger(object):
         self.model = model
         self.trainer = AdamTrainer(model)
 
-    def _build_sentence_expressions(self, sentence, is_train=False):
+    def _build_word_expression_list(self, sentence, is_train=False):
         renew_cg()
 
         sentence_word_vectors = []
@@ -92,30 +92,30 @@ class BiLstmNerTagger(object):
 
         O = parameter(self.param_out)
 
-        sentence_expressions = []
+        sentence_word_expressions = []
         for word_f_embedding, word_b_embedding in zip(embeddings_forward, reversed(embeddings_backward)):
             word_concat_embedding = concatenate([word_f_embedding, word_b_embedding])
 
             word_expression = O * word_concat_embedding
-            sentence_expressions.append(word_expression)
-        return sentence_expressions
+            sentence_word_expressions.append(word_expression)
+        return sentence_word_expressions
 
     def calc_sentence_error(self, sentence):
-        sentence_expressions = self._build_sentence_expressions(sentence, is_train=True)
+        word_expression_list = self._build_word_expression_list(sentence, is_train=True)
 
         sentence_errors = []
-        for word, word_expression in zip(sentence, sentence_expressions):
+        for word, word_expression in zip(sentence, word_expression_list):
             gold_label_index = self.tag_indexer.get_index(word.gold_label)
             word_error = pickneglogsoftmax(word_expression, gold_label_index)
             sentence_errors.append(word_error)
         return esum(sentence_errors)
 
     def calc_sentence_error_viterbi(self, sentence):
-        sentence_expressions = self._build_sentence_expressions(sentence, is_train=True)
+        word_expression_list = self._build_word_expression_list(sentence, is_train=True)
         transition_matrix = parameter(self.param_transition)
 
-        gold_expr = self._get_gold_expression(sentence, sentence_expressions, transition_matrix)
-        _, output_expr = self.decode_sentence_tags_by_viterbi(sentence_expressions, transition_matrix)
+        gold_expr = self._get_gold_expression(sentence, word_expression_list, transition_matrix)
+        output_expr, _ = self.decode_sentence_tags_by_viterbi(word_expression_list, transition_matrix)
         return exp(output_expr - gold_expr)
 
     def _get_gold_expression(self, sentence, sentence_expressions, transition_matrix):
@@ -138,55 +138,54 @@ class BiLstmNerTagger(object):
         return sentence_expr
 
     def tag_sentence_viterbi(self, sentence):
-        sentence_expressions = self._build_sentence_expressions(sentence, is_train=False)
+        word_expression_list = self._build_word_expression_list(sentence, is_train=False)
         transition_matrix = parameter(self.param_transition)
 
-        sentence_tags, best_score_expression = self.decode_sentence_tags_by_viterbi(sentence_expressions,
+        best_score_expression, sentence_tags = self.decode_sentence_tags_by_viterbi(word_expression_list,
                                                                                     transition_matrix)
         for word, word_tag in zip(sentence, sentence_tags):
             word.tag = word_tag
 
     def decode_sentence_tags_by_viterbi(self, sentence_expressions, transition_matrix):
-        prev_viterbi_dict = {self.start_tag_index: (None, None)}
+        cur_viterbi_dict = {self.start_tag_index: (None, None)}
         bp = {}
         for word_index, word_expression in enumerate(sentence_expressions):
+            prev_viterbi_dict = cur_viterbi_dict
             cur_viterbi_dict = {}
             for prev_tag_index, (prev_tag_expr, prev_tag_score) in prev_viterbi_dict.iteritems():
                 for cur_tag_index in xrange(self.word_tag_count):
                     cur_tag_expr = word_expression[cur_tag_index]
                     transition_expr = self._get_transition_expr(transition_matrix, prev_tag_index, cur_tag_index)
 
-                    bigram_expr = transition_expr + cur_tag_expr
-                    bigram_score = transition_expr.npvalue() + cur_tag_expr.npvalue()
-                    if prev_tag_expr is not None:
-                        bigram_expr = prev_tag_expr + bigram_expr
-                        bigram_score = prev_tag_score + bigram_score
+                    bigram_expr = ((prev_tag_expr + transition_expr + cur_tag_expr) if prev_tag_expr is not None else
+                                   (transition_expr + cur_tag_expr))
+                    bigram_score = bigram_expr.npvalue()
 
                     if cur_tag_index not in cur_viterbi_dict or cur_viterbi_dict[cur_tag_index][1] < bigram_score:
                         cur_viterbi_dict[cur_tag_index] = (bigram_expr, bigram_score)
                         bp[(word_index, cur_tag_index)] = prev_tag_index
-            prev_viterbi_dict = cur_viterbi_dict
 
         end_tag_index = self.end_tag_index
         best_viterbi_score = None
         best_score_expression = None
-        for last_tag_index, (last_tag_expr, last_tag_score) in prev_viterbi_dict.iteritems():
+        for last_tag_index, (last_tag_expr, last_tag_score) in cur_viterbi_dict.iteritems():
             transition_expr = self._get_transition_expr(transition_matrix, last_tag_index, end_tag_index)
-            final_score = last_tag_score + transition_expr.npvalue()
+            final_expr = (last_tag_expr + transition_expr) if last_tag_expr is not None else transition_expr
+            final_score = final_expr.npvalue()
 
             if best_viterbi_score is None or best_viterbi_score < final_score:
                 best_viterbi_score = final_score
-                best_score_expression = last_tag_expr + transition_expr
+                best_score_expression = final_expr
                 bp[(len(sentence_expressions), end_tag_index)] = last_tag_index
 
-        sentence_tags = []
-        next_tag_index = end_tag_index
+        best_expression_sentence_tags = []
+        cur_tag_index = end_tag_index
         for idx in xrange(len(sentence_expressions), 0, -1):
-            prev_tag_index = bp[(idx, next_tag_index)]
-            sentence_tags.insert(0, self.tag_indexer.get_object(prev_tag_index))
-            next_tag_index = prev_tag_index
+            prev_tag_index = bp[(idx, cur_tag_index)]
+            best_expression_sentence_tags.insert(0, self.tag_indexer.get_object(prev_tag_index))
+            cur_tag_index = prev_tag_index
 
-        return sentence_tags, best_score_expression
+        return best_score_expression, best_expression_sentence_tags
 
     def _get_transition_expr(self, transition_matrix, prev_tag_index, cur_tag_index):
         transition_index = prev_tag_index * len(self.tag_indexer) + cur_tag_index
@@ -199,8 +198,8 @@ class BiLstmNerTagger(object):
             return expr2 + log(exp(expr1 - expr2))
 
     def tag_sentence(self, sentence):
-        sentence_expressions = self._build_sentence_expressions(sentence, is_train=False)
-        for word, word_expression in zip(sentence, sentence_expressions):
+        word_expression_list = self._build_word_expression_list(sentence, is_train=False)
+        for word, word_expression in zip(sentence, word_expression_list):
             out = softmax(word_expression)
             tag_index = np.argmax(out.npvalue())
             word.tag = self.tag_indexer.get_object(tag_index)
@@ -213,10 +212,7 @@ class BiLstmNerTagger(object):
             print "Starting training iteration %d/%d" % (iteration_idx, iterations)
             random.shuffle(train_sentence_list)
             for sentence_index, sentence in enumerate(train_sentence_list, 1):
-                if iteration_idx < 10:
-                    sentence_error = self.calc_sentence_error(sentence)
-                else:
-                    sentence_error = self.calc_sentence_error_viterbi(sentence)
+                sentence_error = self.calc_sentence_error_viterbi(sentence)
                 loss += sentence_error.scalar_value()
                 tagged += len(sentence)
                 sentence_error.backward()
