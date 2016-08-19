@@ -116,7 +116,7 @@ class BiLstmNerTagger(object):
 
         gold_expr = self._get_gold_expression(sentence, word_expression_list, transition_matrix)
         all_sequence_expr = self._get_all_sequence_expr(word_expression_list, transition_matrix)
-        return gold_expr - all_sequence_expr
+        return all_sequence_expr - gold_expr
 
     def _get_all_sequence_expr(self, word_expression_list, transition_matrix):
         cur_viterbi_dict = {self.start_tag_index: None}
