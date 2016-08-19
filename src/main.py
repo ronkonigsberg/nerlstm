@@ -15,7 +15,7 @@ from bilstm.tagger import BiLstmNerTagger
 random.seed(1)
 
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+BASE_DIR = os.environ.get('LSTM_BASE_DIR')
 
 CONLL_DIR = os.path.join(BASE_DIR, 'conll')
 TRAIN_FILE_PATH = os.path.join(CONLL_DIR, 'eng.train')
