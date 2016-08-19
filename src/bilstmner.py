@@ -128,25 +128,25 @@ class BiLstmNerTagger(object):
                     cur_tag_expr = word_expression[cur_tag_index]
                     transition_expr = self._get_transition_expr(transition_matrix, prev_tag_index, cur_tag_index)
 
-                    bigram_expr = ((prev_tag_expr * exp(transition_expr + cur_tag_expr)) if prev_tag_expr is not None
-                                   else exp(transition_expr + cur_tag_expr))
+                    bigram_expr = ((prev_tag_expr + (transition_expr + cur_tag_expr)) if prev_tag_expr is not None
+                                   else (transition_expr + cur_tag_expr))
 
                     if cur_tag_index not in cur_viterbi_dict:
                         cur_viterbi_dict[cur_tag_index] = bigram_expr
                     else:
-                        cur_viterbi_dict[cur_tag_index] = cur_viterbi_dict[cur_tag_index] + bigram_expr
+                        cur_viterbi_dict[cur_tag_index] = self.logadd_expr(cur_viterbi_dict[cur_tag_index], bigram_expr)
 
         end_tag_index = self.end_tag_index
         all_sequence_expr = None
         for last_tag_index, last_tag_expr in cur_viterbi_dict.iteritems():
             transition_expr = self._get_transition_expr(transition_matrix, last_tag_index, end_tag_index)
-            final_expr = (last_tag_expr * exp(transition_expr)) if last_tag_expr is not None else exp(transition_expr)
+            final_expr = (last_tag_expr + transition_expr) if last_tag_expr is not None else transition_expr
 
             if all_sequence_expr is None:
                 all_sequence_expr = final_expr
             else:
-                all_sequence_expr = all_sequence_expr + final_expr
-        return log(all_sequence_expr)
+                all_sequence_expr = self.logadd_expr(all_sequence_expr, final_expr)
+        return all_sequence_expr
 
     def calc_sentence_error_semi_viterbi(self, sentence):
         word_expression_list = self._build_word_expression_list(sentence, is_train=True)
