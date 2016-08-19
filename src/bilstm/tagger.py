@@ -219,10 +219,6 @@ class BiLstmNerTagger(object):
             word.tag = self.tag_indexer.get_object(tag_index)
 
     def train(self, train_sentence_list, dev_sentence_list=None, test_sentence_list=None, eval_func=None, iterations=5):
-        train_sentence_list = list(train_sentence_list)[:100]
-        dev_sentence_list = train_sentence_list
-        test_sentence_list = None
-
         loss = tagged = 0
         for iteration_idx in xrange(1, iterations+1):
             print "Starting training iteration %d/%d" % (iteration_idx, iterations)

@@ -86,7 +86,6 @@ def main():
     gc.collect()
 
     tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=50)
-    import IPython;IPython.embed()
 
     word_index = 0
     while word_index < len(dev_words):
