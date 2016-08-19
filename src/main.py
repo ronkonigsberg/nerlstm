@@ -15,11 +15,15 @@ from bilstm.tagger import BiLstmNerTagger
 random.seed(1)
 
 
-EVAL_NER_CMD = '/Users/konix/Workspace/nertagger/src/conlleval < {test_file}'
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-TRAIN_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.train'
-DEV_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testa'
-TEST_FILE_PATH = '/Users/konix/Workspace/nertagger/data/eng.testb'
+CONLL_DIR = os.path.join(BASE_DIR, 'conll')
+TRAIN_FILE_PATH = os.path.join(CONLL_DIR, 'eng.train')
+DEV_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testa')
+TEST_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testb')
+EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
+
+EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
 
 
 TAG_SCHEME = BILOU
@@ -45,7 +49,7 @@ def main():
     test_sentences = split_words_to_sentences(test_words)
 
     external_word_embeddings = {}
-    for line in open('/Users/konix/Documents/pos_data/glove.6B/glove.6B.100d.txt', 'rb').readlines():
+    for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
         word, embedding_str = line.split(' ', 1)
         embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
         external_word_embeddings[word] = embedding
