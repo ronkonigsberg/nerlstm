@@ -32,3 +32,7 @@ def format_words(file_obj, word_list, tag_scheme=None):
 
     file_data = format_conll_tagged(words_to_parsed_documents(word_list))
     file_obj.write(file_data)
+
+    if tag_scheme is not None:
+        tag_scheme.encode(word_list, 'gold_label')
+        tag_scheme.encode(word_list, 'tag')
