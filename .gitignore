@@ -1,2 +1,5 @@
 .idea
 *.pyc
+src/Python_BiLstm_NER_Tagger.egg-info
+conll
+glove

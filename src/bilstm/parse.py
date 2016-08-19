@@ -1,5 +1,5 @@
-from nertagger.parser import parse_conll_train, format_conll_tagged
-from nertagger.word import parsed_documents_to_words, words_to_parsed_documents
+from bilstm.conll import parse_conll_train, format_conll_tagged
+from bilstm.word import parsed_documents_to_words, words_to_parsed_documents
 
 
 def parse_words(file_obj, tag_scheme=None):
