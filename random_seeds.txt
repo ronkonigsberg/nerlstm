@@ -1,3 +1,4 @@
 3186371955:     LSTM,    MLP,           iteration 50,    92.80 / 88.81
   31243906:     LSTM,    Perceptron,    iteration 15,    92.97 / 89.34
-  31243906: LSTM-CRF,    Perceptron,    iteration 07,    93.69 / 90.27
+2577335265: LSTM-CRF,    Perceptron,    iteration 21,    93.70 / 90.35
+4212561936: LSTM-CRF,    Perceptron,    iteration 21,    94.17 / 89.51
