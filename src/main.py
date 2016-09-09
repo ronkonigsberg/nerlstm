@@ -5,11 +5,21 @@ from collections import Counter
 from tempfile import NamedTemporaryFile
 
 import numpy as np
+from bilstm.gazetteers import gazetteer_file_to_sentences
 
 from bilstm.parse import parse_words, split_words_to_sentences, format_words
 from bilstm.indexer import Indexer
 from bilstm.tag_scheme import BILOU
 from bilstm.tagger import BiLstmNerTagger
+
+
+GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
+GAZETTEERS_FILE_TO_ENTITY_TYPE = {
+    'WikiPeople.lst': 'PER',
+    'WikiLocations.lst': 'LOC',
+    'known_corporations.lst': 'ORG',
+    'WikiFilms.lst': 'MISC'
+}
 
 
 random.seed(1)
@@ -47,6 +57,12 @@ def main():
     dev_sentences = split_words_to_sentences(dev_words)
     test_words = parse_words(open(TEST_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
     test_sentences = split_words_to_sentences(test_words)
+
+    # gazetteer_sentences = []
+    # for gazetteer_file_name, entity_type in GAZETTEERS_FILE_TO_ENTITY_TYPE.iteritems():
+    #     gazetteer_file_path = os.path.join(GAZETTEERS_DIR_PATH, gazetteer_file_name)
+    #     gazetteer_sentences.extend(gazetteer_file_to_sentences(gazetteer_file_path, entity_type, tag_scheme=TAG_SCHEME))
+    # train_sentences = train_sentences + gazetteer_sentences
 
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
@@ -89,7 +105,7 @@ def main():
     del external_word_embeddings
     gc.collect()
 
-    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=50)
+    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=21)
 
     word_index = 0
     while word_index < len(dev_words):
@@ -104,6 +120,8 @@ def main():
         tagger.tag_sentence_viterbi(sentence)
         word_index += len(sentence)
     format_words(open('/tmp/test_ner', 'wb'), test_words, tag_scheme=TAG_SCHEME)
+
+    import IPython;IPython.embed()
 
 
 if __name__ == '__main__':
