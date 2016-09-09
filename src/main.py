@@ -58,12 +58,6 @@ def main():
     test_words = parse_words(open(TEST_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
     test_sentences = split_words_to_sentences(test_words)
 
-    # gazetteer_sentences = []
-    # for gazetteer_file_name, entity_type in GAZETTEERS_FILE_TO_ENTITY_TYPE.iteritems():
-    #     gazetteer_file_path = os.path.join(GAZETTEERS_DIR_PATH, gazetteer_file_name)
-    #     gazetteer_sentences.extend(gazetteer_file_to_sentences(gazetteer_file_path, entity_type, tag_scheme=TAG_SCHEME))
-    # train_sentences = train_sentences + gazetteer_sentences
-
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
         word, embedding_str = line.split(' ', 1)
@@ -104,6 +98,14 @@ def main():
     del tag_list
     del external_word_embeddings
     gc.collect()
+
+    # gazetteer_sentences = []
+    # for gazetteer_file_name, entity_type in GAZETTEERS_FILE_TO_ENTITY_TYPE.iteritems():
+    #     gazetteer_file_path = os.path.join(GAZETTEERS_DIR_PATH, gazetteer_file_name)
+    #     gazetteer_sentences.extend(gazetteer_file_to_sentences(gazetteer_file_path, entity_type, tag_scheme=TAG_SCHEME))
+    # random.shuffle(gazetteer_sentences)
+    # print "Adding %d gazetteers sentences" % len(gazetteer_sentences)
+    # train_sentences = train_sentences + gazetteer_sentences
 
     tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=21)
 

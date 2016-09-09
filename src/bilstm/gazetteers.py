@@ -3,14 +3,20 @@ import re
 from bilstm.word import Word
 
 
+CHAR_WHITELIST_REGEX = re.compile('^[a-zA-Z \',\."()-]+$')
+
+
 def gazetteer_file_to_sentences(gazetteer_file_path, entity_type, tag_scheme=None):
     gazetteer_words = []
     gazetteer_sentences = []
     for line in open(gazetteer_file_path, 'rb').readlines():
         if '(' in line:
             line = line[:line.find('(')]
-        line = re.sub(" +", ' ', line.replace(',', ' , '))
+        line = re.sub(" +", ' ', line.replace(',', ' , ').replace('"', ' " '))
         line = line.strip('\n\t ')
+
+        if CHAR_WHITELIST_REGEX.match(line) is None:
+            continue
 
         line_words = []
         for word_idx, word_text in enumerate(line.split()):
