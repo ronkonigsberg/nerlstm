@@ -12,7 +12,7 @@ class BiLstmNerTagger(object):
 
     HIDDEN_DIM = 150
 
-    def __init__(self, word_indexer, char_indexer, tag_indexer, external_word_embeddings=None):
+    def __init__(self, word_indexer, char_indexer, tag_indexer, external_word_embeddings=None, model_file_path=None):
         self.word_indexer = word_indexer
         self._unk_word_index = word_indexer.index_object('_UNK_')
         self.char_indexer = char_indexer
@@ -45,6 +45,9 @@ class BiLstmNerTagger(object):
             LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model),
             LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model)
         ]
+
+        if model_file_path is not None:
+            model.load(model_file_path)
 
         self.model = model
         self.trainer = AdamTrainer(model)
