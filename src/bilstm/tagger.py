@@ -13,7 +13,8 @@ class BiLstmNerTagger(object):
 
     HIDDEN_DIM = 150
 
-    def __init__(self, word_indexer, char_indexer, tag_indexer, external_word_embeddings=None, model_file_path=None):
+    def __init__(self, word_indexer, char_indexer, tag_indexer, tag_transition_dict,
+                 external_word_embeddings=None, model_file_path=None):
         self.word_indexer = word_indexer
         self._unk_word_index = word_indexer.index_object('_UNK_')
         self.char_indexer = char_indexer
@@ -22,6 +23,13 @@ class BiLstmNerTagger(object):
         self.start_tag_index = tag_indexer.get_index('-START-')
         self.end_tag_index = tag_indexer.get_index('-END-')
         self.word_tag_count = len(self.tag_indexer) - 2
+
+        tag_indexes_transition_dict = {}
+        for src_tag, dst_tag_list in tag_transition_dict.iteritems():
+            src_tag_index = tag_indexer.get_index(src_tag)
+            dst_tag_indices_list = [tag_indexer.get_index(dst_tag) for dst_tag in dst_tag_list]
+            tag_indexes_transition_dict[src_tag_index] = dst_tag_indices_list
+        self.tag_indexes_transition_dict = tag_indexes_transition_dict
 
         model = Model()
         model.add_lookup_parameters("word_lookup", (len(word_indexer), self.WORD_DIM))
@@ -109,6 +117,8 @@ class BiLstmNerTagger(object):
                 for cur_tag_index in xrange(self.word_tag_count):
                     cur_tag_expr = word_expression[cur_tag_index]
                     transition_expr = self._get_transition_expr(transition_matrix, prev_tag_index, cur_tag_index)
+                    if transition_expr is None:
+                        continue
 
                     bigram_expr = ((prev_tag_expr + (transition_expr + cur_tag_expr)) if prev_tag_expr is not None
                                    else (transition_expr + cur_tag_expr))
@@ -122,6 +132,9 @@ class BiLstmNerTagger(object):
         all_sequence_expr = None
         for last_tag_index, last_tag_expr in cur_viterbi_dict.iteritems():
             transition_expr = self._get_transition_expr(transition_matrix, last_tag_index, end_tag_index)
+            if transition_expr is None:
+                continue
+
             final_expr = (last_tag_expr + transition_expr) if last_tag_expr is not None else transition_expr
 
             if all_sequence_expr is None:
@@ -144,6 +157,11 @@ class BiLstmNerTagger(object):
         for word, word_expression in zip(sentence, word_expression_list):
             cur_gold_tag_index = self.tag_indexer.get_index(word.gold_label)
             transition_expr = self._get_transition_expr(transition_matrix, prev_gold_tag_index, cur_gold_tag_index)
+            if transition_expr is None:
+                src_tag = self.tag_indexer.get_object(prev_gold_tag_index)
+                dst_tag = self.tag_indexer.get_object(cur_gold_tag_index)
+                raise RuntimeError("Gold tag included an invalid transition: %s --> %s" % (src_tag, dst_tag))
+
             cur_tag_expr = word_expression[cur_gold_tag_index]
 
             sentence_expr = ((sentence_expr + transition_expr + cur_tag_expr) if sentence_expr is not None else
@@ -152,6 +170,10 @@ class BiLstmNerTagger(object):
             prev_gold_tag_index = cur_gold_tag_index
 
         final_transition_expr = self._get_transition_expr(transition_matrix, prev_gold_tag_index, self.end_tag_index)
+        if final_transition_expr is None:
+            src_tag = self.tag_indexer.get_object(prev_gold_tag_index)
+            raise RuntimeError("Gold tag included an invalid transition: %s --> %s" % (src_tag, '-END-'))
+
         sentence_expr = (sentence_expr + final_transition_expr) if sentence_expr is not None else final_transition_expr
         return sentence_expr
 
@@ -174,6 +196,8 @@ class BiLstmNerTagger(object):
                 for cur_tag_index in xrange(self.word_tag_count):
                     cur_tag_expr = word_expression[cur_tag_index]
                     transition_expr = self._get_transition_expr(transition_matrix, prev_tag_index, cur_tag_index)
+                    if transition_expr is None:
+                        continue
 
                     bigram_expr = ((prev_tag_expr + transition_expr + cur_tag_expr) if prev_tag_expr is not None else
                                    (transition_expr + cur_tag_expr))
@@ -188,6 +212,9 @@ class BiLstmNerTagger(object):
         best_score_expression = None
         for last_tag_index, (last_tag_expr, last_tag_score) in cur_viterbi_dict.iteritems():
             transition_expr = self._get_transition_expr(transition_matrix, last_tag_index, end_tag_index)
+            if transition_expr is None:
+                continue
+
             final_expr = (last_tag_expr + transition_expr) if last_tag_expr is not None else transition_expr
             final_score = final_expr.npvalue()
 
@@ -206,6 +233,9 @@ class BiLstmNerTagger(object):
         return best_score_expression, best_expression_sentence_tags
 
     def _get_transition_expr(self, transition_matrix, prev_tag_index, cur_tag_index):
+        if cur_tag_index not in self.tag_indexes_transition_dict[prev_tag_index]:
+            return None
+
         transition_index = prev_tag_index * len(self.tag_indexer) + cur_tag_index
         return transition_matrix[transition_index]
 

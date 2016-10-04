@@ -65,6 +65,9 @@ def main():
             tag_list.append(word_.gold_label)
             char_list.extend(word_.text)
 
+    entity_types = set([word_.gold_label[2:] for word_ in train_words if word_.gold_label != 'O'])
+    tag_transition_dict = TAG_SCHEME.get_tag_transitions(entity_types)
+
     word_counter = Counter(word_list)
     word_indexer = Indexer()
     word_indexer.index_object_list(
@@ -83,7 +86,7 @@ def main():
     tag_indexer.index_object('-START-')
     tag_indexer.index_object('-END-')
 
-    tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, external_word_embeddings)
+    tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, tag_transition_dict, external_word_embeddings)
 
     del word_list
     del char_list

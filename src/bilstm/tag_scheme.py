@@ -41,6 +41,23 @@ class BIO(object):
 
             prev_type = word_type
 
+    @staticmethod
+    def get_tag_transitions(entity_types):
+        unconditional_next_tags = ['B-%s' % entity_type_ for entity_type_ in entity_types] + ['O', '-END-']
+
+        tag_transition_dict = {}
+        for entity_type in entity_types:
+            B_entity_tag = 'B-' + entity_type
+            I_entity_tag = 'I-' + entity_type
+            tag_transition_dict[B_entity_tag] = unconditional_next_tags + [I_entity_tag]
+            tag_transition_dict[I_entity_tag] = unconditional_next_tags + [I_entity_tag]
+
+        tag_transition_dict['O'] = unconditional_next_tags
+        tag_transition_dict['-START-'] = unconditional_next_tags
+        tag_transition_dict['-END-'] = []
+
+        return tag_transition_dict
+
 
 class BILOU(object):
     """
@@ -102,6 +119,29 @@ class BILOU(object):
 
             prev_type = word_type
 
+    @staticmethod
+    def get_tag_transitions(entity_types):
+        unconditional_next_tags = (['U-%s' % entity_type_ for entity_type_ in entity_types] +
+                                    ['B-%s' % entity_type_ for entity_type_ in entity_types] +
+                                    ['O', '-END-'])
+
+        tag_transition_dict = {}
+        for entity_type in entity_types:
+            B_entity_tag = 'B-' + entity_type
+            I_entity_tag = 'I-' + entity_type
+            L_entity_tag = 'L-' + entity_type
+            U_entity_tag = 'U-' + entity_type
+
+            tag_transition_dict[B_entity_tag] = [I_entity_tag, L_entity_tag]
+            tag_transition_dict[I_entity_tag] = [I_entity_tag, L_entity_tag]
+            tag_transition_dict[L_entity_tag] = unconditional_next_tags
+            tag_transition_dict[U_entity_tag] = unconditional_next_tags
+
+        tag_transition_dict['O'] = unconditional_next_tags
+        tag_transition_dict['-START-'] = unconditional_next_tags
+        tag_transition_dict['-END-'] = []
+
+        return tag_transition_dict
 
 def _get_word_type(word, tag_attr):
     tag = getattr(word, tag_attr)
