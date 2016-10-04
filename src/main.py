@@ -25,6 +25,8 @@ EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
 
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
 
+MODEL_SAVE_DIR = os.path.join(BASE_DIR, 'saved_models', 'seed_2577335265')
+
 
 TAG_SCHEME = BILOU
 
@@ -89,7 +91,8 @@ def main():
     del external_word_embeddings
     gc.collect()
 
-    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=50)
+    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=50,
+                 model_save_dir=MODEL_SAVE_DIR)
 
     word_index = 0
     while word_index < len(dev_words):

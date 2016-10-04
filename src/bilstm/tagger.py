@@ -218,7 +218,8 @@ class BiLstmNerTagger(object):
             tag_index = np.argmax(out.npvalue())
             word.tag = self.tag_indexer.get_object(tag_index)
 
-    def train(self, train_sentence_list, dev_sentence_list=None, test_sentence_list=None, eval_func=None, iterations=5):
+    def train(self, train_sentence_list, dev_sentence_list=None, test_sentence_list=None, eval_func=None, iterations=5,
+              model_save_dir=None):
         train_sentence_list = list(train_sentence_list)
 
         loss = tagged = 0
@@ -248,6 +249,10 @@ class BiLstmNerTagger(object):
                 for test_sentence in test_sentence_list:
                     self.tag_sentence_viterbi(test_sentence)
                 eval_func(test_sentence_list)
+
+            if model_save_dir is not None:
+                iteration_save_file = os.path.join(model_save_dir, 'iteration_%d' % iteration_idx)
+                self.model.save(iteration_save_file)
 
     def _get_word_vector(self, word, use_dropout=False):
         word_embedding = self._get_word_embedding(word)
