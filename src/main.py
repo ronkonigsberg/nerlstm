@@ -1,6 +1,8 @@
 import os
 import gc
+import time
 import random
+import hashlib
 from collections import Counter
 from tempfile import NamedTemporaryFile
 
@@ -24,8 +26,6 @@ TEST_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testb')
 EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
 
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
-
-MODEL_SAVE_DIR = os.path.join(BASE_DIR, 'saved_models', 'seed_2577335265')
 
 
 TAG_SCHEME = BILOU
@@ -94,8 +94,13 @@ def main():
     del external_word_embeddings
     gc.collect()
 
-    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=50,
-                 model_save_dir=MODEL_SAVE_DIR)
+    model_save_dir_name = hashlib.md5("%d:%f" % (os.getpid(), time.time())).hexdigest()
+    model_save_dir_path = os.path.join(BASE_DIR, 'saved_models', model_save_dir_name)
+    os.mkdir(model_save_dir_path)
+    print "Saving trained models to: %s" % model_save_dir_path
+
+    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=20,
+                 model_save_dir=model_save_dir_path)
 
     word_index = 0
     while word_index < len(dev_words):

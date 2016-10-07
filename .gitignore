@@ -3,3 +3,4 @@
 src/Python_BiLstm_NER_Tagger.egg-info
 conll
 glove
+saved_models
