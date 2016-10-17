@@ -26,6 +26,8 @@ TEST_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testb')
 EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
 
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
+BROWN_FILE_PATH = '/Users/konix/Workspace/nertagger/resources/brown-clusters/' \
+                  'brown-rcv1.clean.tokenized-CoNLL03.txt-c1000-freq1.txt'
 
 
 TAG_SCHEME = BILOU
@@ -55,6 +57,12 @@ def main():
         word, embedding_str = line.split(' ', 1)
         embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
         external_word_embeddings[word] = embedding
+
+    brown_clusters = {}
+    with open(BROWN_FILE_PATH, 'rb') as brown_file:
+        for word_line_ in brown_file:
+            word_cluster, word_text, word_freq = word_line_.split('\t')
+            brown_clusters[word_text] = (word_cluster + '0'*4)[:4]
 
     word_list = []
     char_list = []
@@ -86,7 +94,8 @@ def main():
     tag_indexer.index_object('-START-')
     tag_indexer.index_object('-END-')
 
-    tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, tag_transition_dict, external_word_embeddings)
+    tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, tag_transition_dict, brown_clusters,
+                             external_word_embeddings)
 
     del word_list
     del char_list

@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, dropout, parameter, concatenate,
-                   softmax, pickneglogsoftmax, esum, log, exp)
+                   softmax, pickneglogsoftmax, esum, log, exp, vecInput)
 
 
 class BiLstmNerTagger(object):
@@ -13,7 +13,7 @@ class BiLstmNerTagger(object):
 
     HIDDEN_DIM = 150
 
-    def __init__(self, word_indexer, char_indexer, tag_indexer, tag_transition_dict,
+    def __init__(self, word_indexer, char_indexer, tag_indexer, tag_transition_dict, brown_clusters,
                  external_word_embeddings=None, model_file_path=None):
         self.word_indexer = word_indexer
         self._unk_word_index = word_indexer.index_object('_UNK_')
@@ -30,6 +30,9 @@ class BiLstmNerTagger(object):
             dst_tag_indices_list = [tag_indexer.get_index(dst_tag) for dst_tag in dst_tag_list]
             tag_indexes_transition_dict[src_tag_index] = dst_tag_indices_list
         self.tag_indexes_transition_dict = tag_indexes_transition_dict
+
+        self.brown_clusters = brown_clusters
+        self.brown_cluster_len = len(brown_clusters.itervalues().next())
 
         model = Model()
         model.add_lookup_parameters("word_lookup", (len(word_indexer), self.WORD_DIM))
@@ -51,8 +54,8 @@ class BiLstmNerTagger(object):
         ]
 
         self.word_builders = [
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model),
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model)
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.brown_cluster_len, self.LSTM_DIM, model),
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.brown_cluster_len, self.LSTM_DIM, model)
         ]
 
         if model_file_path is not None:
@@ -292,7 +295,11 @@ class BiLstmNerTagger(object):
         word_embedding = self._get_word_embedding(word)
         char_representation = self._get_char_representation(word)
 
-        word_vector = concatenate([word_embedding, char_representation])
+        word_brown_cluster = self.brown_clusters.get(word.text, '0'*self.brown_cluster_len)
+        brown_vector = vecInput(self.brown_cluster_len)
+        brown_vector.set([int(brown_bit) for brown_bit in word_brown_cluster])
+
+        word_vector = concatenate([word_embedding, char_representation, brown_vector])
         if use_dropout:
             word_vector = dropout(word_vector, 0.5)
         return word_vector
