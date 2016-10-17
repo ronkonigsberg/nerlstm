@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, dropout, parameter, concatenate,
-                   softmax, pickneglogsoftmax, esum, log, exp)
+                   softmax, pickneglogsoftmax, esum, log, exp, vecInput)
 
 
 class BiLstmNerTagger(object):
@@ -51,8 +51,10 @@ class BiLstmNerTagger(object):
         ]
 
         self.word_builders = [
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model),
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model)
+            LSTMBuilder(1, (self.WORD_DIM + self.CHAR_DIM*2 + 2), self.LSTM_DIM, model),
+            LSTMBuilder(1, (self.WORD_DIM + self.CHAR_DIM*2 + 2), self.LSTM_DIM, model)
+            # LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model),
+            # LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model)
         ]
 
         if model_file_path is not None:
@@ -292,7 +294,10 @@ class BiLstmNerTagger(object):
         word_embedding = self._get_word_embedding(word)
         char_representation = self._get_char_representation(word)
 
-        word_vector = concatenate([word_embedding, char_representation])
+        casing_vector = vecInput(2)
+        casing_vector.set([1 if word.text.istitle() else 0, 1 if word.text.isupper() else 0])
+
+        word_vector = concatenate([casing_vector, word_embedding, char_representation])
         if use_dropout:
             word_vector = dropout(word_vector, 0.5)
         return word_vector
