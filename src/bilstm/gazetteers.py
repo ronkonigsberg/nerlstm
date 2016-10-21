@@ -11,7 +11,7 @@ class GazetteersAnnotator(object):
 
     def annotate_data(self, word_list):
         for word in word_list:
-            setattr(word, self.ANNOTATION_ATTRIBUTE, list())
+            setattr(word, self.ANNOTATION_ATTRIBUTE, set())
 
         for word in word_list:
             self._annotate_from_anchor(word)
@@ -38,13 +38,13 @@ class GazetteersAnnotator(object):
                 if expression in gazetteer:
                     for word, label in zip(expression_words, expression_labels):
                         word_gazetteer_list = getattr(word, self.ANNOTATION_ATTRIBUTE)
-                        word_gazetteer_list .append(label+gazetteer_name)
+                        word_gazetteer_list.add(gazetteer_name)
 
             for gazetteer_name, gazetteer_lowercase in self._gazetteers_lowercase.iteritems():
                 if expression.lower() in gazetteer_lowercase:
                     for word, label in zip(expression_words, expression_labels):
                         word_gazetteer_list = getattr(word, self.ANNOTATION_ATTRIBUTE)
-                        word_gazetteer_list.append(label+gazetteer_name+"(lower)")
+                        word_gazetteer_list.add(gazetteer_name+"(lower)")
 
 
 def parse_gazetteers_directory(gazetteers_dir_path):
