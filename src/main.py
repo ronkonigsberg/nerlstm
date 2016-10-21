@@ -4,11 +4,13 @@ import time
 import random
 import hashlib
 from collections import Counter
+from itertools import chain
 from tempfile import NamedTemporaryFile
 
 import numpy as np
 
 from bilstm.parse import parse_words, split_words_to_sentences, format_words
+from bilstm.gazetteers import create_gazetteers_annotator
 from bilstm.indexer import Indexer
 from bilstm.tag_scheme import BILOU
 from bilstm.tagger import BiLstmNerTagger
@@ -26,6 +28,7 @@ TEST_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testb')
 EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
 
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
+GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
 
 
 TAG_SCHEME = BILOU
@@ -49,6 +52,15 @@ def main():
     dev_sentences = split_words_to_sentences(dev_words)
     test_words = parse_words(open(TEST_FILE_PATH, 'rb'), tag_scheme=TAG_SCHEME)
     test_sentences = split_words_to_sentences(test_words)
+
+    gazetteers_annotator = create_gazetteers_annotator(GAZETTEERS_DIR_PATH)
+    gazetteers_annotator.annotate_data(train_words)
+    gazetteers_annotator.annotate_data(dev_words)
+    gazetteers_annotator.annotate_data(test_words)
+
+    gazetteers_set = set()
+    for word in chain(train_words):
+        gazetteers_set.update(word.gazetteers)
 
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
