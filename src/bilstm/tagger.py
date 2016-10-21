@@ -3,7 +3,7 @@ import random
 
 import numpy as np
 from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, dropout, parameter, concatenate,
-                   softmax, pickneglogsoftmax, esum, log, exp)
+                   softmax, pickneglogsoftmax, esum, log, exp, vecInput)
 
 
 class BiLstmNerTagger(object):
@@ -13,7 +13,7 @@ class BiLstmNerTagger(object):
 
     HIDDEN_DIM = 150
 
-    def __init__(self, word_indexer, char_indexer, tag_indexer, tag_transition_dict,
+    def __init__(self, word_indexer, char_indexer, tag_indexer, tag_transition_dict, gazetteers_indexer,
                  external_word_embeddings=None, model_file_path=None):
         self.word_indexer = word_indexer
         self._unk_word_index = word_indexer.index_object('_UNK_')
@@ -23,6 +23,9 @@ class BiLstmNerTagger(object):
         self.start_tag_index = tag_indexer.get_index('-START-')
         self.end_tag_index = tag_indexer.get_index('-END-')
         self.word_tag_count = len(self.tag_indexer) - 2
+
+        self.gazetteers_indexer = gazetteers_indexer
+        self.gazetteers_count = len(gazetteers_indexer)
 
         tag_indexes_transition_dict = {}
         for src_tag, dst_tag_list in tag_transition_dict.iteritems():
@@ -51,8 +54,8 @@ class BiLstmNerTagger(object):
         ]
 
         self.word_builders = [
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model),
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2, self.LSTM_DIM, model)
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count, self.LSTM_DIM, model),
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count, self.LSTM_DIM, model)
         ]
 
         if model_file_path is not None:
@@ -295,7 +298,12 @@ class BiLstmNerTagger(object):
         word_vector = concatenate([word_embedding, char_representation])
         if use_dropout:
             word_vector = dropout(word_vector, 0.5)
-        return word_vector
+
+        gazetteer_vector = vecInput(self.gazetteers_count)
+        gazetteer_vector.set([1 if self.gazetteers_indexer.get_object(gazetteer_index) in word.gazetteers else 0
+                              for gazetteer_index in xrange(len(self.gazetteers_indexer))])
+
+        return concatenate([word_vector, gazetteer_vector])
 
     def _get_word_embedding(self, word):
         word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index

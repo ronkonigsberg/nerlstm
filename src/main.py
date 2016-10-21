@@ -60,6 +60,8 @@ def main():
     gazetteers_set = set()
     for word in train_words:
         gazetteers_set.update(word.gazetteers)
+    gazetteers_indexer = Indexer()
+    gazetteers_indexer.index_object_list(gazetteers_set)
 
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
@@ -97,7 +99,8 @@ def main():
     tag_indexer.index_object('-START-')
     tag_indexer.index_object('-END-')
 
-    tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, tag_transition_dict, external_word_embeddings)
+    tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, tag_transition_dict, gazetteers_indexer,
+                             external_word_embeddings)
 
     del word_list
     del char_list
