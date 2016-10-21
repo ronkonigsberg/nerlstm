@@ -4,7 +4,6 @@ import time
 import random
 import hashlib
 from collections import Counter
-from itertools import chain
 from tempfile import NamedTemporaryFile
 
 import numpy as np
@@ -59,7 +58,7 @@ def main():
     gazetteers_annotator.annotate_data(test_words)
 
     gazetteers_set = set()
-    for word in chain(train_words):
+    for word in train_words:
         gazetteers_set.update(word.gazetteers)
 
     external_word_embeddings = {}
