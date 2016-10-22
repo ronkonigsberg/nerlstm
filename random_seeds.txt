@@ -4,3 +4,7 @@
 4212561936:  LSTM-CRF,     Perceptron,    iteration 21,    94.17 / 89.51
 4086655944: LSTM-CRF*,     Perceptron,    iteration 7,     93.81 / 90.32
 4086655944: LSTM-CRF*+GAZ, Perceptron,    iteration 5,     93.66 / 90.70
+4086655944: LSTM-CRF*+GAZ, Perceptron,    iteration 10,    94.18 / 90.65
+4086655944: LSTM-CRF*+GAZ, Perceptron,    iteration 16,    94.09 / 90.60
+            -DENSE
+
