@@ -1,5 +1,6 @@
-3186371955:      LSTM,    MLP,           iteration 50,    92.80 / 88.81
-  31243906:      LSTM,    Perceptron,    iteration 15,    92.97 / 89.34
-2577335265:  LSTM-CRF,    Perceptron,    iteration 21,    93.70 / 90.35
-4212561936:  LSTM-CRF,    Perceptron,    iteration 21,    94.17 / 89.51
-4086655944: LSTM-CRF*,    Perceptron,    iteration 7,     93.81 / 90.32
+3186371955:      LSTM,     MLP,           iteration 50,    92.80 / 88.81
+  31243906:      LSTM,     Perceptron,    iteration 15,    92.97 / 89.34
+2577335265:  LSTM-CRF,     Perceptron,    iteration 21,    93.70 / 90.35
+4212561936:  LSTM-CRF,     Perceptron,    iteration 21,    94.17 / 89.51
+4086655944: LSTM-CRF*,     Perceptron,    iteration 7,     93.81 / 90.32
+4086655944: LSTM-CRF*+GAZ, Perceptron,    iteration 5,     93.66 / 90.70
