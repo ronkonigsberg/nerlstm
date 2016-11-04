@@ -52,7 +52,7 @@ def main():
 
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
-        word, embedding_str = line.split(' ', 1)
+        word, embedding_str = line.rstrip().split(' ', 1)
         embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
         external_word_embeddings[word] = embedding
 
