@@ -68,4 +68,4 @@ def parse_gazetteers_directory(gazetteers_dir_path):
 
 def create_gazetteers_annotator(gazetteers_dir_path):
     gazetteers, lowercase_gazetteers = parse_gazetteers_directory(gazetteers_dir_path)
-    return GazetteersAnnotator(gazetteers, lowercase_gazetteers)
+    return GazetteersAnnotator(gazetteers, {})
