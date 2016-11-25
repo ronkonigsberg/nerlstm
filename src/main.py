@@ -3,7 +3,8 @@ import gc
 import time
 import random
 import hashlib
-from collections import Counter
+from itertools import chain
+from collections import Counter, defaultdict
 from tempfile import NamedTemporaryFile
 
 import numpy as np
@@ -57,11 +58,14 @@ def main():
     gazetteers_annotator.annotate_data(dev_words)
     gazetteers_annotator.annotate_data(test_words)
 
-    gazetteers_set = set()
-    for word in train_words:
-        gazetteers_set.update(word.gazetteers)
+    gazetteers_names = set()
+    word_to_gazetteers = defaultdict(set)
+    for word in chain(train_words, dev_words, test_words):
+        if word.gazetteers:
+            word_to_gazetteers[word.text.lower()].update(word.gazetteers)
+            gazetteers_names.update(word.gazetteers)
     gazetteers_indexer = Indexer()
-    gazetteers_indexer.index_object_list(gazetteers_set)
+    gazetteers_indexer.index_object_list(gazetteers_names)
 
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
@@ -113,7 +117,9 @@ def main():
     os.mkdir(model_save_dir_path)
     print "Saving trained models to: %s" % model_save_dir_path
 
-    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=20,
+    tagger.train_gazetteers(word_to_gazetteers, iterations=1000)
+    import IPython;IPython.embed()
+    tagger.train(train_sentences, dev_sentences, test_sentences, eval_func=eval_ner, iterations=50,
                  model_save_dir=model_save_dir_path)
 
     word_index = 0

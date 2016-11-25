@@ -2,8 +2,8 @@ import os
 import random
 
 import numpy as np
-from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, dropout, parameter, concatenate,
-                   softmax, pickneglogsoftmax, esum, log, exp, vecInput)
+from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, dropout, parameter, concatenate, tanh,
+                   squared_distance, softmax, pickneglogsoftmax, esum, log, exp, vecInput)
 
 
 class BiLstmNerTagger(object):
@@ -12,6 +12,8 @@ class BiLstmNerTagger(object):
     LSTM_DIM = 100
 
     GAZETTEER_DIM = 5
+
+    GAZ_HIDDEN_DIM = 50
 
     HIDDEN_DIM = 150
 
@@ -40,12 +42,18 @@ class BiLstmNerTagger(object):
         model.add_lookup_parameters("char_lookup", (len(char_indexer), self.CHAR_DIM))
         model.add_lookup_parameters("gazetteer_lookup",  (len(gazetteers_indexer), self.GAZETTEER_DIM))
 
+        model.add_lookup_parameters("gazetteers_word_lookup", (len(word_indexer), self.WORD_DIM))
+        self.param_gazetteers_hidden = model.add_parameters("GAZ_HIDDEN", (self.GAZ_HIDDEN_DIM, self.WORD_DIM))
+        self.param_gazetteers_out = model.add_parameters("GAZ_OUT", (len(self.gazetteers_indexer), self.GAZ_HIDDEN_DIM))
+
         if external_word_embeddings:
             word_lookup = model["word_lookup"]
+            word_gazetteer_lookup = model["gazetteers_word_lookup"]
             for idx in xrange(len(word_indexer)):
                 word = word_indexer.get_object(idx)
                 if word in external_word_embeddings:
                     word_lookup.init_row(idx, external_word_embeddings[word])
+                    word_gazetteer_lookup.init_row(idx, external_word_embeddings[word])
 
         self.param_transition = model.add_parameters("TRANSITION", (len(tag_indexer)**2,  1))
         self.param_out = model.add_parameters("OUT", (self.word_tag_count, self.LSTM_DIM*2))
@@ -332,3 +340,59 @@ class BiLstmNerTagger(object):
             lstm_forward = lstm_forward.add_input(char_vector)
             lstm_backward = lstm_backward.add_input(reverse_char_vector)
         return concatenate([lstm_forward.output(), lstm_backward.output()])
+
+    def train_gazetteers(self, train_word_to_gazetteers, iterations=500):
+        training_examples = self._build_gazetteers_training_vectors(train_word_to_gazetteers)
+
+        for iteration_idx in xrange(1, iterations+1):
+            print "Starting training iteration %d/%d" % (iteration_idx, iterations)
+            random.shuffle(training_examples)
+            loss = 0
+
+            for example_index, (word_index, expected_output) in enumerate(training_examples, 1):
+                renew_cg()
+                out_expression = self._build_gazetteers_expression(word_index)
+
+                expected_output_expr = vecInput(len(self.gazetteers_indexer))
+                expected_output_expr.set(expected_output)
+                sentence_error = squared_distance(out_expression, expected_output_expr)
+
+                loss += sentence_error.scalar_value()
+                sentence_error.backward()
+                self.trainer.update()
+
+            # Trainer Status
+            self.trainer.status()
+            print loss / float(len(training_examples))
+
+    def get_word_gazetteer(self, word_text):
+        word_index = self.word_indexer.get_index(word_text.lower())
+        if word_index is None:
+            return None
+
+        renew_cg()
+        word_gazetteers_vector = self._build_gazetteers_expression(word_index).npvalue()
+
+        min_index, min_diff = None, None
+        for gazetteer_index, gazetter_value in enumerate(word_gazetteers_vector):
+            cur_diff = abs(gazetter_value - 1)
+            if min_diff is None or cur_diff < min_diff:
+                min_diff = cur_diff
+                min_index = gazetteer_index
+        return self.gazetteers_indexer.get_object(min_index)
+
+    def _build_gazetteers_training_vectors(self, word_to_gazetteers):
+        examples = []
+        for word, word_gazetteers in word_to_gazetteers.iteritems():
+            word_index = self.word_indexer.get_index(word) or self._unk_word_index
+            word_gazetteers_indices = [1 if self.gazetteers_indexer.get_object(gazetteer_idx) in word_gazetteers else 0
+                                       for gazetteer_idx in xrange(len(self.gazetteers_indexer))]
+            examples.append((word_index, np.asarray(word_gazetteers_indices)))
+        return examples
+
+    def _build_gazetteers_expression(self, word_index):
+        H = parameter(self.param_gazetteers_hidden)
+        O = parameter(self.param_gazetteers_out)
+
+        word_vector = lookup(self.model["gazetteers_word_lookup"], word_index, False)
+        return O * tanh(H * word_vector)
