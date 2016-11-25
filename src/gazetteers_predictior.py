@@ -1,6 +1,7 @@
 import os
 import random
 from itertools import chain
+from functools import partial
 from collections import defaultdict
 
 import numpy as np
@@ -87,8 +88,8 @@ class GazetteerClassifier(object):
         H = parameter(self.param_hidden)
         O = parameter(self.param_out)
 
-        word_vector = lookup(self.model["word_lookup"], word_index)
-        return softmax(O * tanh(H * word_vector))
+        word_vector = lookup(self.model["word_lookup"], word_index, False)
+        return O * tanh(H * word_vector)
 
 
 def parse_gazetteers_directory(gazetteers_dir_path):
@@ -110,6 +111,18 @@ def parse_gazetteers_directory(gazetteers_dir_path):
     return gazetteers, lowercase_gazetteers
 
 
+def find_gazetteer(my_clf, word_indexer, gazetteer_indexer, word_text):
+    word_index = word_indexer.get_index(word_text)
+    gazetteer_vector = my_clf.build_expression(word_index).npvalue()
+    min_index, min_diff = None, None
+    for gazetteer_index, gazetter_value in enumerate(gazetteer_vector):
+        cur_diff = abs(gazetter_value - 1)
+        if min_diff is None or cur_diff< min_diff:
+            min_diff = cur_diff
+            min_index = gazetteer_index
+    return gazetteer_indexer.get_object(min_index)
+
+
 def main():
     train_words = parse_words(open(TRAIN_FILE_PATH, 'rb'))
     dev_words = parse_words(open(DEV_FILE_PATH, 'rb'))
@@ -123,12 +136,12 @@ def main():
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
         word, embedding_str = line.rstrip().split(' ', 1)
         word = word.lower()
-        if word in dataset_words_set:
-            embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
-            external_word_embeddings[word] = embedding
+        embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
+        external_word_embeddings[word] = embedding
 
     word_indexer = Indexer()
     word_indexer.index_object_list(dataset_words_set)
+    word_indexer.index_object_list(external_word_embeddings.keys())
 
     gazetteers_annotator = create_gazetteers_annotator(GAZETTEERS_DIR_PATH)
     gazetteers_annotator.annotate_data(train_words)
@@ -146,10 +159,14 @@ def main():
     gazetteer_indexer = Indexer()
     gazetteer_indexer.index_object_list(gazetteers_names)
 
-    word_to_gazetteers.pop('jack')
+    num_words = len(word_to_gazetteers)
+    train_to_gazetteer = dict(word_to_gazetteers.items()[:int(0.9*num_words)])
+    test_to_gazetteer = dict(word_to_gazetteers.items()[int(0.9*num_words):])
+
     my_clf = GazetteerClassifier(word_indexer, gazetteer_indexer, external_word_embeddings)
     my_clf.train(word_to_gazetteers, iterations=500)
 
+    my_find_gazetteer = partial(find_gazetteer, my_clf, word_indexer, gazetteer_indexer)
     import IPython;IPython.embed()
 
 
