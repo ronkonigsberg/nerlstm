@@ -11,8 +11,6 @@ class BiLstmNerTagger(object):
     CHAR_DIM = 25
     LSTM_DIM = 100
 
-    GAZETTEER_DIM = 5
-
     GAZ_HIDDEN_DIM = 50
 
     HIDDEN_DIM = 150
@@ -29,6 +27,7 @@ class BiLstmNerTagger(object):
         self.word_tag_count = len(self.tag_indexer) - 2
 
         self.gazetteers_indexer = gazetteers_indexer
+        self.gazetteers_count = len(gazetteers_indexer)
 
         tag_indexes_transition_dict = {}
         for src_tag, dst_tag_list in tag_transition_dict.iteritems():
@@ -40,11 +39,10 @@ class BiLstmNerTagger(object):
         model = Model()
         model.add_lookup_parameters("word_lookup", (len(word_indexer), self.WORD_DIM))
         model.add_lookup_parameters("char_lookup", (len(char_indexer), self.CHAR_DIM))
-        model.add_lookup_parameters("gazetteer_lookup",  (len(gazetteers_indexer), self.GAZETTEER_DIM))
 
         model.add_lookup_parameters("gazetteers_word_lookup", (len(word_indexer), self.WORD_DIM))
         self.param_gazetteers_hidden = model.add_parameters("GAZ_HIDDEN", (self.GAZ_HIDDEN_DIM, self.WORD_DIM))
-        self.param_gazetteers_out = model.add_parameters("GAZ_OUT", (len(self.gazetteers_indexer), self.GAZ_HIDDEN_DIM))
+        self.param_gazetteers_out = model.add_parameters("GAZ_OUT", (self.gazetteers_count, self.GAZ_HIDDEN_DIM))
 
         if external_word_embeddings:
             word_lookup = model["word_lookup"]
@@ -64,8 +62,8 @@ class BiLstmNerTagger(object):
         ]
 
         self.word_builders = [
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.GAZETTEER_DIM, self.LSTM_DIM, model),
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.GAZETTEER_DIM, self.LSTM_DIM, model)
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count, self.LSTM_DIM, model),
+            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count, self.LSTM_DIM, model)
         ]
 
         if model_file_path is not None:
@@ -309,13 +307,12 @@ class BiLstmNerTagger(object):
         if use_dropout:
             word_vector = dropout(word_vector, 0.5)
 
-        gazetteer_vector = vecInput(self.GAZETTEER_DIM)
-        gazetteer_vector.set([0] * self.GAZETTEER_DIM)
-        for gazetteer in word.gazetteers:
-            gazetteer_index = self.gazetteers_indexer.get_index(gazetteer)
-            if gazetteer_index is not None:
-                gazetteer_repr = lookup(self.model["gazetteer_lookup"], gazetteer_index)
-                gazetteer_vector = gazetteer_vector + gazetteer_repr
+        # gazetteer_vector = vecInput(self.gazetteers_count)
+        # gazetteer_vector.set([1 if self.gazetteers_indexer.get_object(gazetteer_index_) in word.gazetteers else 0
+        #                       for gazetteer_index_ in xrange(len(self.gazetteers_indexer))])
+
+        word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index
+        gazetteer_vector = self._build_gazetteers_expression(word_index)
 
         return concatenate([word_vector, gazetteer_vector])
 
