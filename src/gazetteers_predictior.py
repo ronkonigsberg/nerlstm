@@ -2,8 +2,9 @@ import os
 import random
 from itertools import chain
 from functools import partial
-from collections import defaultdict
+from collections import Counter, defaultdict
 
+import json
 import numpy as np
 
 from pycnn import (Model, AdamTrainer, LSTMBuilder, renew_cg, lookup, dropout, parameter, concatenate,
@@ -23,6 +24,65 @@ TEST_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testb')
 
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
 GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
+
+CLASS_TO_GAZETTEERS = {
+    'nationality': {
+        'KnownNationalities.txt',
+        'known_nationalities.lst'
+    },
+
+    'job': {
+        'known_jobs.lst',
+        'known_title.lst',
+        'Occupations.txt',
+        'VincentNgPeopleTitles.txt'
+    },
+
+    'company': {
+        'known_corporations.lst',
+        'WikiOrganizations.lst',
+        'WikiOrganizationsRedirects.lst'
+    },
+
+    'place': {
+        'known_place.lst',
+        'known_state.lst',
+        'known_country.lst',
+        'WikiLocations.lst',
+        'WikiLocationsRedirects.lst'
+    },
+
+    'person': {
+        'known_name.lst',
+        'known_names.big.lst',
+        'WikiPeople.lst',
+        'WikiPeopleRedirects.lst'
+    },
+
+    'object_name': {
+        'WikiArtWork.lst',
+        'WikiArtWorkRedirects.lst',
+        'WikiManMadeObjectNames.lst',
+        'WikiManMadeObjectNamesRedirects.lst',
+        'WikiCompetitionsBattlesEvents.lst',
+        'WikiCompetitionsBattlesEventsRedirects.lst'
+    },
+
+    'ext': {
+        'WikiFilms.lst',
+        'WikiFilmsRedirects.lst',
+        'WikiSongs.lst',
+        'WikiSongsRedirects.lst',
+
+        'measurments.txt',
+        'ordinalNumber.txt',
+        'temporal_words.txt',
+        'cardinalNumber.txt',
+        'currencyFinal.txt'
+    }
+}
+
+
 
 
 class GazetteerClassifier(object):
@@ -148,26 +208,45 @@ def main():
     gazetteers_annotator.annotate_data(dev_words)
     gazetteers_annotator.annotate_data(test_words)
 
-    gazetteers_names = set()
+    gazetteer_to_class = {}
+    for gazetteer_class, class_gazetteer_set in CLASS_TO_GAZETTEERS.iteritems():
+        for gazetteer in class_gazetteer_set:
+            gazetteer_to_class[gazetteer] = gazetteer_class
+
     word_to_gazetteers = defaultdict(set)
     for word in chain(train_words, dev_words, test_words):
         if word.gazetteers:
             word_gazetteer_names = [gazetteer_part[2:] for gazetteer_part in word.gazetteers]
-            word_to_gazetteers[word.text.lower()].update(word_gazetteer_names)
-            gazetteers_names.update(word_gazetteer_names)
+            word_gazetteer_classes = set([gazetteer_to_class[gazetteer_] for gazetteer_ in word_gazetteer_names])
+            word_to_gazetteers[word.text.lower()].update(word_gazetteer_classes)
 
     gazetteer_indexer = Indexer()
-    gazetteer_indexer.index_object_list(gazetteers_names)
+    gazetteer_indexer.index_object_list(CLASS_TO_GAZETTEERS.keys())
+
+    train_word_count = Counter([y_.text.lower() for y_ in train_words])
+    common_train_words = [word_text_ for word_text_, word_count_ in train_word_count.iteritems() if word_count_ >= 10]
+    ext_train_words = [word_text_ for word_text_ in common_train_words if word_text_ not in word_to_gazetteers]
+    for word_text_ in ext_train_words:
+        word_to_gazetteers[word_text_] = {'ext'}
 
     num_words = len(word_to_gazetteers)
     train_to_gazetteer = dict(word_to_gazetteers.items()[:int(0.9*num_words)])
     test_to_gazetteer = dict(word_to_gazetteers.items()[int(0.9*num_words):])
 
     my_clf = GazetteerClassifier(word_indexer, gazetteer_indexer, external_word_embeddings)
-    my_clf.train(word_to_gazetteers, iterations=500)
+    my_clf.train(train_to_gazetteer, iterations=1000)
 
     my_find_gazetteer = partial(find_gazetteer, my_clf, word_indexer, gazetteer_indexer)
-    import IPython;IPython.embed()
+
+    print "Calculating class for each word"
+    word_to_class = {}
+    for word in external_word_embeddings.iterkeys():
+        if word in dataset_words_set:
+            word_to_class[word] = my_find_gazetteer(word)
+
+    print "Saving results to file"
+    with open('/tmp/word_to_class.json', 'wb') as result_file:
+        json.dump(word_to_class, result_file)
 
 
 if __name__ == '__main__':
