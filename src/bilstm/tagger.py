@@ -14,7 +14,7 @@ class BiLstmNerTagger(object):
     HIDDEN_DIM = 150
 
     def __init__(self, word_indexer, char_indexer, tag_indexer, tag_transition_dict, gazetteers_indexer,
-                 external_word_embeddings=None, model_file_path=None):
+                 gazetteers_class_indexer, external_word_embeddings=None, model_file_path=None):
         self.word_indexer = word_indexer
         self._unk_word_index = word_indexer.index_object('_UNK_')
         self.char_indexer = char_indexer
@@ -26,6 +26,9 @@ class BiLstmNerTagger(object):
 
         self.gazetteers_indexer = gazetteers_indexer
         self.gazetteers_count = len(gazetteers_indexer)
+
+        self.gazetteers_class_indexer = gazetteers_class_indexer
+        self.gazetteers_class_count = len(gazetteers_class_indexer)
 
         tag_indexes_transition_dict = {}
         for src_tag, dst_tag_list in tag_transition_dict.iteritems():
@@ -53,9 +56,11 @@ class BiLstmNerTagger(object):
             LSTMBuilder(1, self.CHAR_DIM, self.CHAR_DIM, model)
         ]
 
+        # word_lstm_input_len = self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_class_count
+        word_lstm_input_len = self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count + self.gazetteers_class_count
         self.word_builders = [
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count, self.LSTM_DIM, model),
-            LSTMBuilder(1, self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count, self.LSTM_DIM, model)
+            LSTMBuilder(1, word_lstm_input_len, self.LSTM_DIM, model),
+            LSTMBuilder(1, word_lstm_input_len, self.LSTM_DIM, model)
         ]
 
         if model_file_path is not None:
@@ -295,15 +300,21 @@ class BiLstmNerTagger(object):
         word_embedding = self._get_word_embedding(word)
         char_representation = self._get_char_representation(word)
 
-        word_vector = concatenate([word_embedding, char_representation])
-        if use_dropout:
-            word_vector = dropout(word_vector, 0.5)
-
         gazetteer_vector = vecInput(self.gazetteers_count)
         gazetteer_vector.set([1 if self.gazetteers_indexer.get_object(gazetteer_index) in word.gazetteers else 0
                               for gazetteer_index in xrange(len(self.gazetteers_indexer))])
 
-        return concatenate([word_vector, gazetteer_vector])
+        gazetteer_class_vector_values = [0] * self.gazetteers_class_count
+        if word.gazetteer_class is not None:
+            gazetteer_class_vector_values[self.gazetteers_class_indexer.get_index(word.gazetteer_class)] = 1
+
+        gazetteer_class_vector = vecInput(self.gazetteers_class_count)
+        gazetteer_class_vector.set(gazetteer_class_vector_values)
+
+        word_vector = concatenate([word_embedding, char_representation, gazetteer_vector, gazetteer_class_vector])
+        if use_dropout:
+            word_vector = dropout(word_vector, 0.5)
+        return word_vector
 
     def _get_word_embedding(self, word):
         word_index = self.word_indexer.get_index(word.text.lower()) or self._unk_word_index

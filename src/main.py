@@ -1,8 +1,10 @@
 import os
 import gc
+import json
 import time
 import random
 import hashlib
+from itertools import chain
 from collections import Counter
 from tempfile import NamedTemporaryFile
 
@@ -28,6 +30,7 @@ EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
 
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
 GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
+GAZETTEERS_CLASS_FILE_PATH = '/tmp/word_to_class.json'
 
 
 TAG_SCHEME = BILOU
@@ -62,6 +65,14 @@ def main():
         gazetteers_set.update(word.gazetteers)
     gazetteers_indexer = Indexer()
     gazetteers_indexer.index_object_list(gazetteers_set)
+
+    with open(GAZETTEERS_CLASS_FILE_PATH, 'rb') as gazetteers_class_file:
+        word_to_gazetteer_class = json.load(gazetteers_class_file)
+
+    for word in chain(train_words, dev_words, test_words):
+        word.gazetteer_class = word_to_gazetteer_class.get(word.text.lower(), None)
+    gazetteers_class_indexer = Indexer()
+    gazetteers_class_indexer.index_object_list(set(word_to_gazetteer_class.values()))
 
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
@@ -100,7 +111,7 @@ def main():
     tag_indexer.index_object('-END-')
 
     tagger = BiLstmNerTagger(word_indexer, char_indexer, tag_indexer, tag_transition_dict, gazetteers_indexer,
-                             external_word_embeddings)
+                             gazetteers_class_indexer, external_word_embeddings)
 
     del word_list
     del char_list
