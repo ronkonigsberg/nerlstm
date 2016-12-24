@@ -56,7 +56,6 @@ class BiLstmNerTagger(object):
             LSTMBuilder(1, self.CHAR_DIM, self.CHAR_DIM, model)
         ]
 
-        # word_lstm_input_len = self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_class_count
         word_lstm_input_len = self.WORD_DIM + self.CHAR_DIM*2 + self.gazetteers_count + self.gazetteers_class_count
         self.word_builders = [
             LSTMBuilder(1, word_lstm_input_len, self.LSTM_DIM, model),
@@ -304,9 +303,12 @@ class BiLstmNerTagger(object):
         gazetteer_vector.set([1 if self.gazetteers_indexer.get_object(gazetteer_index) in word.gazetteers else 0
                               for gazetteer_index in xrange(len(self.gazetteers_indexer))])
 
-        gazetteer_class_vector_values = [0] * self.gazetteers_class_count
-        if word.gazetteer_class is not None:
-            gazetteer_class_vector_values[self.gazetteers_class_indexer.get_index(word.gazetteer_class)] = 1
+        if word.gazetteer_class_scores is not None:
+            gazetteer_class_vector_values = [
+                word.gazetteer_class_scores[self.gazetteers_class_indexer.get_object(class_index_)] for class_index_
+                in xrange(self.gazetteers_class_count)]
+        else:
+            gazetteer_class_vector_values = [0] * self.gazetteers_class_count
 
         gazetteer_class_vector = vecInput(self.gazetteers_class_count)
         gazetteer_class_vector.set(gazetteer_class_vector_values)
