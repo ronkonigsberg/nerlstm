@@ -33,12 +33,12 @@ CLASS_TO_GAZETTEERS = {
 
     'job': {
         'known_jobs.lst',
-        'known_title.lst',
         'Occupations.txt',
+        'known_title.lst',
         'VincentNgPeopleTitles.txt'
     },
 
-    'company': {
+    'organization': {
         'known_corporations.lst',
         'WikiOrganizations.lst',
         'WikiOrganizationsRedirects.lst'
@@ -83,6 +83,18 @@ CLASS_TO_GAZETTEERS = {
 }
 
 
+NLTK_STOP_WORDS = ['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours',
+                   'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers',
+                   'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
+                   'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are',
+                   'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does',
+                   'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until',
+                   'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into',
+                   'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down',
+                   'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here',
+                   'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+                   'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
+                   'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now']
 
 
 class GazetteerClassifier(object):
@@ -175,12 +187,22 @@ def find_gazetteer(my_clf, word_indexer, gazetteer_indexer, word_text):
     word_index = word_indexer.get_index(word_text)
     gazetteer_vector = my_clf.build_expression(word_index).npvalue()
     min_index, min_diff = None, None
-    for gazetteer_index, gazetter_value in enumerate(gazetteer_vector):
-        cur_diff = abs(gazetter_value - 1)
+    for gazetteer_index, gazetteer_value in enumerate(gazetteer_vector):
+        cur_diff = abs(gazetteer_value - 1)
         if min_diff is None or cur_diff< min_diff:
             min_diff = cur_diff
             min_index = gazetteer_index
     return gazetteer_indexer.get_object(min_index)
+
+
+def get_gazetteer_scores(my_clf, word_indexer, gazetteer_indexer, word_text):
+    word_index = word_indexer.get_index(word_text)
+    gazetteer_vector = my_clf.build_expression(word_index).npvalue()
+    score_by_gazetteer = {}
+    for gazetteer_index, gazetteer_value in enumerate(gazetteer_vector):
+        gazetteer_name = gazetteer_indexer.get_object(gazetteer_index)
+        score_by_gazetteer[gazetteer_name] = gazetteer_value
+    return score_by_gazetteer
 
 
 def main():
@@ -229,24 +251,39 @@ def main():
     for word_text_ in ext_train_words:
         word_to_gazetteers[word_text_] = {'ext'}
 
+    # make sure ext is used only for N/A
+    for word_text, word_gazetteers in word_to_gazetteers.iteritems():
+        if 'ext' in word_gazetteers and len(word_gazetteers) > 1:
+            word_gazetteers.remove('ext')
+
+    for word_text in NLTK_STOP_WORDS:
+        if word_text in external_word_embeddings:
+            word_to_gazetteers[word_text] = {'ext'}
+
     num_words = len(word_to_gazetteers)
-    train_to_gazetteer = dict(word_to_gazetteers.items()[:int(0.9*num_words)])
-    test_to_gazetteer = dict(word_to_gazetteers.items()[int(0.9*num_words):])
+    # train_to_gazetteer = dict(word_to_gazetteers.items()[:int(0.9*num_words)])
+    # test_to_gazetteer = dict(word_to_gazetteers.items()[int(0.9*num_words):])
 
     my_clf = GazetteerClassifier(word_indexer, gazetteer_indexer, external_word_embeddings)
-    my_clf.train(train_to_gazetteer, iterations=1000)
+    my_clf.train(word_to_gazetteers, iterations=1500)
 
     my_find_gazetteer = partial(find_gazetteer, my_clf, word_indexer, gazetteer_indexer)
+    my_get_gazetteer_scores = partial(get_gazetteer_scores, my_clf, word_indexer, gazetteer_indexer)
+    import IPython;IPython.embed()
 
-    print "Calculating class for each word"
+    print "Calculating class and vector for each word"
     word_to_class = {}
+    word_to_class_scores = {}
     for word in external_word_embeddings.iterkeys():
         if word in dataset_words_set:
             word_to_class[word] = my_find_gazetteer(word)
+            word_to_class_scores[word] = my_get_gazetteer_scores(word)
 
     print "Saving results to file"
     with open('/tmp/word_to_class.json', 'wb') as result_file:
         json.dump(word_to_class, result_file)
+    with open('/tmp/word_to_class_scores.json', 'wb') as result_file:
+        json.dump(word_to_class_scores, result_file)
 
 
 if __name__ == '__main__':
