@@ -31,6 +31,7 @@ EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
 GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
 GAZETTEERS_CLASS_FILE_PATH = '/tmp/word_to_class.json'
+GAZETTEERS_CLASS_SCORES_FILE_PATH = '/tmp/word_to_class_scores.json'
 
 
 TAG_SCHEME = BILOU
@@ -68,9 +69,12 @@ def main():
 
     with open(GAZETTEERS_CLASS_FILE_PATH, 'rb') as gazetteers_class_file:
         word_to_gazetteer_class = json.load(gazetteers_class_file)
+    with open(GAZETTEERS_CLASS_SCORES_FILE_PATH, 'rb') as gazetteers_class_scores_file:
+        word_to_gazetteer_class_scores = json.load(gazetteers_class_scores_file)
 
     for word in chain(train_words, dev_words, test_words):
         word.gazetteer_class = word_to_gazetteer_class.get(word.text.lower(), None)
+        word.gazetteer_class_scores = word_to_gazetteer_class_scores .get(word.text.lower(), None)
     gazetteers_class_indexer = Indexer()
     gazetteers_class_indexer.index_object_list(set(word_to_gazetteer_class.values()))
 
