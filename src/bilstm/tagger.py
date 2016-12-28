@@ -28,7 +28,7 @@ class BiLstmNerTagger(object):
         self.gazetteers_count = len(gazetteers_indexer)
 
         self.gazetteers_class_indexer = gazetteers_class_indexer
-        self.gazetteers_class_count = len(gazetteers_class_indexer)
+        self.gazetteers_class_count = len(gazetteers_class_indexer) if gazetteers_class_indexer is not None else 0
 
         tag_indexes_transition_dict = {}
         for src_tag, dst_tag_list in tag_transition_dict.iteritems():
@@ -298,24 +298,27 @@ class BiLstmNerTagger(object):
     def _get_word_vector(self, word, use_dropout=False):
         word_embedding = self._get_word_embedding(word)
         char_representation = self._get_char_representation(word)
+        word_vector = concatenate([word_embedding, char_representation])
+        if use_dropout:
+            word_vector = dropout(word_vector, 0.5)
 
         gazetteer_vector = vecInput(self.gazetteers_count)
         gazetteer_vector.set([1 if self.gazetteers_indexer.get_object(gazetteer_index) in word.gazetteers else 0
                               for gazetteer_index in xrange(len(self.gazetteers_indexer))])
+        word_vector = concatenate([word_vector, gazetteer_vector])
 
-        if word.gazetteer_class_scores is not None:
-            gazetteer_class_vector_values = [
-                word.gazetteer_class_scores[self.gazetteers_class_indexer.get_object(class_index_)] for class_index_
-                in xrange(self.gazetteers_class_count)]
-        else:
-            gazetteer_class_vector_values = [0] * self.gazetteers_class_count
+        if self.gazetteers_class_indexer is not None:
+            if word.gazetteer_class_scores is not None:
+                gazetteer_class_vector_values = [
+                    word.gazetteer_class_scores[self.gazetteers_class_indexer.get_object(class_index_)] for
+                    class_index_ in xrange(self.gazetteers_class_count)]
+            else:
+                gazetteer_class_vector_values = [0] * self.gazetteers_class_count
 
-        gazetteer_class_vector = vecInput(self.gazetteers_class_count)
-        gazetteer_class_vector.set(gazetteer_class_vector_values)
+            gazetteer_class_vector = vecInput(self.gazetteers_class_count)
+            gazetteer_class_vector.set(gazetteer_class_vector_values)
+            word_vector = concatenate([word_vector, gazetteer_class_vector])
 
-        word_vector = concatenate([word_embedding, char_representation, gazetteer_vector, gazetteer_class_vector])
-        if use_dropout:
-            word_vector = dropout(word_vector, 0.5)
         return word_vector
 
     def _get_word_embedding(self, word):
