@@ -138,14 +138,14 @@ def main():
         sentence = dev_words[word_index].sentence
         tagger.tag_sentence_viterbi(sentence)
         word_index += len(sentence)
-    format_words(open('/tmp/dev_ner', 'wb'), dev_words, tag_scheme=TAG_SCHEME)
+    format_words(open('/tmp/%s_dev_ner' % model_save_dir_name, 'wb'), dev_words, tag_scheme=TAG_SCHEME)
 
     word_index = 0
     while word_index < len(test_words):
         sentence = test_words[word_index].sentence
         tagger.tag_sentence_viterbi(sentence)
         word_index += len(sentence)
-    format_words(open('/tmp/test_ner', 'wb'), test_words, tag_scheme=TAG_SCHEME)
+    format_words(open('/tmp/%s_test_ner' % model_save_dir_name, 'wb'), test_words, tag_scheme=TAG_SCHEME)
 
 
 if __name__ == '__main__':
