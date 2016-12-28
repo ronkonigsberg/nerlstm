@@ -30,8 +30,10 @@ EVAL_NER_CMD = '%s < {test_file}' % os.path.join(CONLL_DIR, 'conlleval')
 
 EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
 GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
-GAZETTEERS_CLASS_FILE_PATH = '/tmp/word_to_class.json'
-GAZETTEERS_CLASS_SCORES_FILE_PATH = '/tmp/word_to_class_scores.json'
+
+GAZETTEERS_CLASS_DIR = os.path.join(BASE_DIR, 'gazetteer_class')
+GAZETTEERS_CLASS_FILE_PATH = os.path.join(GAZETTEERS_CLASS_DIR, '/tmp/word_to_class.json')
+GAZETTEERS_CLASS_SCORES_FILE_PATH = os.path.join(GAZETTEERS_CLASS_DIR, 'word_to_class_scores.json')
 
 
 TAG_SCHEME = BILOU
