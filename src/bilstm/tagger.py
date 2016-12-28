@@ -25,7 +25,7 @@ class BiLstmNerTagger(object):
         self.word_tag_count = len(self.tag_indexer) - 2
 
         self.gazetteers_indexer = gazetteers_indexer
-        self.gazetteers_count = len(gazetteers_indexer)
+        self.gazetteers_count = len(gazetteers_indexer) if gazetteers_indexer is not None else 0
 
         self.gazetteers_class_indexer = gazetteers_class_indexer
         self.gazetteers_class_count = len(gazetteers_class_indexer) if gazetteers_class_indexer is not None else 0
@@ -302,10 +302,11 @@ class BiLstmNerTagger(object):
         if use_dropout:
             word_vector = dropout(word_vector, 0.5)
 
-        gazetteer_vector = vecInput(self.gazetteers_count)
-        gazetteer_vector.set([1 if self.gazetteers_indexer.get_object(gazetteer_index) in word.gazetteers else 0
-                              for gazetteer_index in xrange(len(self.gazetteers_indexer))])
-        word_vector = concatenate([word_vector, gazetteer_vector])
+        if self.gazetteers_indexer is not None:
+            gazetteer_vector = vecInput(self.gazetteers_count)
+            gazetteer_vector.set([1 if self.gazetteers_indexer.get_object(gazetteer_index) in word.gazetteers else 0
+                                  for gazetteer_index in xrange(len(self.gazetteers_indexer))])
+            word_vector = concatenate([word_vector, gazetteer_vector])
 
         if self.gazetteers_class_indexer is not None:
             if word.gazetteer_class_scores is not None:
