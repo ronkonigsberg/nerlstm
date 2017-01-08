@@ -22,7 +22,8 @@ TRAIN_FILE_PATH = os.path.join(CONLL_DIR, 'eng.train')
 DEV_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testa')
 TEST_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testb')
 
-EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
+# EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
+EMBEDDINGS_FILE_PATH = '/Users/konix/Documents/pos_data/glove.twitter.27B/glove.twitter.27B.100d.txt'
 GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
 
 CLASS_TO_GAZETTEERS = {
@@ -206,13 +207,13 @@ def get_gazetteer_scores(my_clf, word_indexer, gazetteer_indexer, word_text):
 
 
 def main():
-    train_words = parse_words(open(TRAIN_FILE_PATH, 'rb'))
-    dev_words = parse_words(open(DEV_FILE_PATH, 'rb'))
-    test_words = parse_words(open(TEST_FILE_PATH, 'rb'))
-
-    train_word_set = set([word_.text.lower() for word_ in train_words])
-    dev_and_test_word_set = set([word_.text.lower() for word_ in chain(dev_words, test_words)])
-    dataset_words_set = train_word_set.union(dev_and_test_word_set)
+    # train_words = parse_words(open(TRAIN_FILE_PATH, 'rb'))
+    # dev_words = parse_words(open(DEV_FILE_PATH, 'rb'))
+    # test_words = parse_words(open(TEST_FILE_PATH, 'rb'))
+    #
+    # train_word_set = set([word_.text.lower() for word_ in train_words])
+    # dev_and_test_word_set = set([word_.text.lower() for word_ in chain(dev_words, test_words)])
+    # dataset_words_set = train_word_set.union(dev_and_test_word_set)
 
     external_word_embeddings = {}
     for line in open(EMBEDDINGS_FILE_PATH, 'rb').readlines():
@@ -221,69 +222,103 @@ def main():
         embedding = np.asarray([float(value_str) for value_str in embedding_str.split()])
         external_word_embeddings[word] = embedding
 
+    pos_words = open('/Users/konix/positive.txt', 'rb').read().split('\n')[:-1]
+    pos_words = [word_text_ for word_text_ in pos_words if word_text_ in external_word_embeddings]
+    random.shuffle(pos_words)
+    cufoff = int(len(pos_words) * 1)
+    pos_words_train, pos_words_test = pos_words[:cufoff], pos_words[cufoff:]
+
+    neg_words = open('/Users/konix/negative.txt', 'rb').read().split('\n')[:-1]
+    neg_words = [word_text_ for word_text_ in neg_words if word_text_ in external_word_embeddings]
+    random.shuffle(neg_words)
+    cufoff = int(len(neg_words) * 1)
+    neg_words_train, neg_words_test = neg_words[:cufoff], neg_words[cufoff:]
+
+    word_to_sentiment = {}
+    pos_also_neg = set()
+    for word in pos_words_train:
+        word_to_sentiment[word] = ['positive']
+        if random.random() < 0:
+            word_to_sentiment[word].append('negative')
+            pos_also_neg.add(word)
+    neg_also_pos = set()
+    for word in neg_words_train:
+        word_to_sentiment[word] = ['negative']
+        if random.random() < 0:
+            word_to_sentiment[word].append('positive')
+            neg_also_pos.add(word)
+
+    sentiment_indexer = Indexer()
+    sentiment_indexer.index_object_list(['positive', 'negative'])
+
     word_indexer = Indexer()
-    word_indexer.index_object_list(dataset_words_set)
+    # word_indexer.index_object_list(dataset_words_set)
     word_indexer.index_object_list(external_word_embeddings.keys())
 
-    gazetteers_annotator = create_gazetteers_annotator(GAZETTEERS_DIR_PATH)
-    gazetteers_annotator.annotate_data(train_words)
-    gazetteers_annotator.annotate_data(dev_words)
-    gazetteers_annotator.annotate_data(test_words)
-
-    gazetteer_to_class = {}
-    for gazetteer_class, class_gazetteer_set in CLASS_TO_GAZETTEERS.iteritems():
-        for gazetteer in class_gazetteer_set:
-            gazetteer_to_class[gazetteer] = gazetteer_class
-
-    word_to_gazetteers = defaultdict(set)
-    for word in chain(train_words, dev_words, test_words):
-        if word.gazetteers:
-            word_gazetteer_names = [gazetteer_part[2:] for gazetteer_part in word.gazetteers]
-            word_gazetteer_classes = set([gazetteer_to_class[gazetteer_] for gazetteer_ in word_gazetteer_names])
-            word_to_gazetteers[word.text.lower()].update(word_gazetteer_classes)
-
-    gazetteer_indexer = Indexer()
-    gazetteer_indexer.index_object_list(CLASS_TO_GAZETTEERS.keys())
-
-    train_word_count = Counter([y_.text.lower() for y_ in train_words])
-    common_train_words = [word_text_ for word_text_, word_count_ in train_word_count.iteritems() if word_count_ >= 10]
-    ext_train_words = [word_text_ for word_text_ in common_train_words if word_text_ not in word_to_gazetteers]
-    for word_text_ in ext_train_words:
-        word_to_gazetteers[word_text_] = {'ext'}
-
-    # make sure ext is used only for N/A
-    for word_text, word_gazetteers in word_to_gazetteers.iteritems():
-        if 'ext' in word_gazetteers and len(word_gazetteers) > 1:
-            word_gazetteers.remove('ext')
-
-    for word_text in NLTK_STOP_WORDS:
-        if word_text in external_word_embeddings:
-            word_to_gazetteers[word_text] = {'ext'}
-
-    num_words = len(word_to_gazetteers)
+    # gazetteers_annotator = create_gazetteers_annotator(GAZETTEERS_DIR_PATH)
+    # gazetteers_annotator.annotate_data(train_words)
+    # gazetteers_annotator.annotate_data(dev_words)
+    # gazetteers_annotator.annotate_data(test_words)
+    #
+    # gazetteer_to_class = {}
+    # for gazetteer_class, class_gazetteer_set in CLASS_TO_GAZETTEERS.iteritems():
+    #     for gazetteer in class_gazetteer_set:
+    #         gazetteer_to_class[gazetteer] = gazetteer_class
+    #
+    # word_to_gazetteers = defaultdict(set)
+    # for word in chain(train_words, dev_words, test_words):
+    #     if word.gazetteers:
+    #         word_gazetteer_names = [gazetteer_part[2:] for gazetteer_part in word.gazetteers]
+    #         word_gazetteer_classes = set([gazetteer_to_class[gazetteer_] for gazetteer_ in word_gazetteer_names])
+    #         word_to_gazetteers[word.text.lower()].update(word_gazetteer_classes)
+    #
+    # gazetteer_indexer = Indexer()
+    # gazetteer_indexer.index_object_list(CLASS_TO_GAZETTEERS.keys())
+    #
+    # train_word_count = Counter([y_.text.lower() for y_ in train_words])
+    # common_train_words = [word_text_ for word_text_, word_count_ in train_word_count.iteritems() if word_count_ >= 10]
+    # ext_train_words = [word_text_ for word_text_ in common_train_words if word_text_ not in word_to_gazetteers]
+    # for word_text_ in ext_train_words:
+    #     word_to_gazetteers[word_text_] = {'ext'}
+    #
+    # # make sure ext is used only for N/A
+    # for word_text, word_gazetteers in word_to_gazetteers.iteritems():
+    #     if 'ext' in word_gazetteers and len(word_gazetteers) > 1:
+    #         word_gazetteers.remove('ext')
+    #
+    # for word_text in NLTK_STOP_WORDS:
+    #     if word_text in external_word_embeddings:
+    #         word_to_gazetteers[word_text] = {'ext'}
+    #
+    # num_words = len(word_to_gazetteers)
     # train_to_gazetteer = dict(word_to_gazetteers.items()[:int(0.9*num_words)])
     # test_to_gazetteer = dict(word_to_gazetteers.items()[int(0.9*num_words):])
+    #
+    # my_clf = GazetteerClassifier(word_indexer, gazetteer_indexer, external_word_embeddings)
+    # my_clf.train(word_to_gazetteers, iterations=1500)
 
-    my_clf = GazetteerClassifier(word_indexer, gazetteer_indexer, external_word_embeddings)
-    my_clf.train(word_to_gazetteers, iterations=1500)
+    my_clf = GazetteerClassifier(word_indexer, sentiment_indexer, external_word_embeddings)
+    my_clf.train(word_to_sentiment, iterations=1000)
 
-    my_find_gazetteer = partial(find_gazetteer, my_clf, word_indexer, gazetteer_indexer)
-    my_get_gazetteer_scores = partial(get_gazetteer_scores, my_clf, word_indexer, gazetteer_indexer)
+    # my_find_gazetteer = partial(find_gazetteer, my_clf, word_indexer, gazetteer_indexer)
+    # my_get_gazetteer_scores = partial(get_gazetteer_scores, my_clf, word_indexer, gazetteer_indexer)
+    my_find_sentiment = partial(find_gazetteer, my_clf, word_indexer, sentiment_indexer)
+    my_get_sentiment_scores = partial(get_gazetteer_scores, my_clf, word_indexer, sentiment_indexer)
     import IPython;IPython.embed()
 
-    print "Calculating class and vector for each word"
-    word_to_class = {}
-    word_to_class_scores = {}
-    for word in external_word_embeddings.iterkeys():
-        if word in dataset_words_set:
-            word_to_class[word] = my_find_gazetteer(word)
-            word_to_class_scores[word] = my_get_gazetteer_scores(word)
-
-    print "Saving results to file"
-    with open('/tmp/word_to_class.json', 'wb') as result_file:
-        json.dump(word_to_class, result_file)
-    with open('/tmp/word_to_class_scores.json', 'wb') as result_file:
-        json.dump(word_to_class_scores, result_file)
+    # print "Calculating class and vector for each word"
+    # word_to_class = {}
+    # word_to_class_scores = {}
+    # for word in external_word_embeddings.iterkeys():
+    #     if word in dataset_words_set:
+    #         word_to_class[word] = my_find_gazetteer(word)
+    #         word_to_class_scores[word] = my_get_gazetteer_scores(word)
+    #
+    # print "Saving results to file"
+    # with open('/tmp/word_to_class.json', 'wb') as result_file:
+    #     json.dump(word_to_class, result_file)
+    # with open('/tmp/word_to_class_scores.json', 'wb') as result_file:
+    #     json.dump(word_to_class_scores, result_file)
 
 
 if __name__ == '__main__':
