@@ -15,7 +15,7 @@ from bilstm.parse import parse_words
 from bilstm.gazetteers import create_gazetteers_annotator
 
 
-BASE_DIR = os.environ.get('LSTM_BASE_DIR')
+BASE_DIR = os. environ.get('LSTM_BASE_DIR')
 
 CONLL_DIR = os.path.join(BASE_DIR, 'conll')
 TRAIN_FILE_PATH = os.path.join(CONLL_DIR, 'eng.train')
@@ -23,7 +23,24 @@ DEV_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testa')
 TEST_FILE_PATH = os.path.join(CONLL_DIR, 'eng.testb')
 
 # EMBEDDINGS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.6B.100d.txt')
-EMBEDDINGS_FILE_PATH = '/Users/konix/Documents/pos_data/glove.twitter.27B/glove.twitter.27B.100d.txt'
+# WORDS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.100d.words')
+# VECTORS_FILE_PATH = os.path.join(BASE_DIR, 'glove', 'glove.100d.vectors')
+
+# EMBEDDINGS_FILE_PATH = '/Users/konix/Documents/pos_data/glove.twitter.27B/glove.twitter.27B.100d.txt'
+
+EMBEDDINGS_FILE_PATH = '/Users/konix/Workspace/GloVe-1.2/yelp_vectors.txt'
+WORDS_FILE_PATH = "/Users/konix/Workspace/GloVe-1.2/yelp.50d.words"
+VECTORS_FILE_PATH = "/Users/konix/Workspace/GloVe-1.2/yelp.50d.vectors"
+COMMON_WORDS_FILE_PATH = "/Users/konix/Workspace/nerlstm/glove/yelp_common"
+CLASSIFICATION_FILE_PATH = "/Users/konix/Workspace/nerlstm/glove/yelp_classification"
+
+# EMBEDDINGS_FILE_PATH = '/Users/konix/Workspace/GloVe-1.2/amazon_vectors.txt'
+# WORDS_FILE_PATH = "/Users/konix/Workspace/GloVe-1.2/amazon.50d.words"
+# VECTORS_FILE_PATH = "/Users/konix/Workspace/GloVe-1.2/amazon.50d.vectors"
+# COMMON_WORDS_FILE_PATH = "/Users/konix/Workspace/nerlstm/glove/amazon_common"
+# CLASSIFICATION_FILE_PATH = "/Users/konix/Workspace/nerlstm/glove/amazon_classification"
+
+
 GAZETTEERS_DIR_PATH = '/Users/konix/Workspace/nertagger/resources/gazetteers'
 
 CLASS_TO_GAZETTEERS = {
@@ -99,8 +116,8 @@ NLTK_STOP_WORDS = ['i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 
 
 
 class GazetteerClassifier(object):
-    WORD_DIM = 100
-    HIDDEN_DIM = 50
+    WORD_DIM = 50
+    HIDDEN_DIM = 25
 
     def __init__(self, word_indexer, gazetteer_indexer, external_word_embeddings=None):
         self.word_indexer = word_indexer
@@ -206,6 +223,11 @@ def get_gazetteer_scores(my_clf, word_indexer, gazetteer_indexer, word_text):
     return score_by_gazetteer
 
 
+def predict_all_words(my_clf, E):
+    H = np.tanh(np.dot(E, np.transpose(my_clf.param_hidden.as_array())))
+    return np.dot(H, np.transpose(my_clf.param_out.as_array()))
+
+
 def main():
     # train_words = parse_words(open(TRAIN_FILE_PATH, 'rb'))
     # dev_words = parse_words(open(DEV_FILE_PATH, 'rb'))
@@ -235,18 +257,27 @@ def main():
     neg_words_train, neg_words_test = neg_words[:cufoff], neg_words[cufoff:]
 
     word_to_sentiment = {}
-    pos_also_neg = set()
+    # pos_also_neg = set()
     for word in pos_words_train:
         word_to_sentiment[word] = ['positive']
-        if random.random() < 0:
-            word_to_sentiment[word].append('negative')
-            pos_also_neg.add(word)
-    neg_also_pos = set()
+        # if random.random() < 0:
+        #     word_to_sentiment[word].append('negative')
+        #     pos_also_neg.add(word)
+    # neg_also_pos = set()
     for word in neg_words_train:
         word_to_sentiment[word] = ['negative']
-        if random.random() < 0:
-            word_to_sentiment[word].append('positive')
-            neg_also_pos.add(word)
+        # if random.random() < 0:
+        #     word_to_sentiment[word].append('positive')
+        #     neg_also_pos.add(word)
+
+    for word_text in NLTK_STOP_WORDS:
+        if word_text in external_word_embeddings:
+            word_to_sentiment[word_text] = []
+
+    common_words = open(COMMON_WORDS_FILE_PATH, 'rb').read().split('\n')
+    for word_text in common_words:
+        if word_text in external_word_embeddings and word_text not in word_to_sentiment:
+            word_to_sentiment[word_text] = []
 
     sentiment_indexer = Indexer()
     sentiment_indexer.index_object_list(['positive', 'negative'])
@@ -304,6 +335,24 @@ def main():
     # my_get_gazetteer_scores = partial(get_gazetteer_scores, my_clf, word_indexer, gazetteer_indexer)
     my_find_sentiment = partial(find_gazetteer, my_clf, word_indexer, sentiment_indexer)
     my_get_sentiment_scores = partial(get_gazetteer_scores, my_clf, word_indexer, sentiment_indexer)
+
+    W = np.array(file(WORDS_FILE_PATH).read().strip().split())
+    w2i = {w_: i_ for (i_, w_) in enumerate(W)}
+    E = np.loadtxt(VECTORS_FILE_PATH)
+
+    prediction_matrix = predict_all_words(my_clf, E)
+
+    word_by_sentiment = {'positive': [], 'negative': []}
+    for w, i in w2i.iteritems():
+        pos_score, neg_score = prediction_matrix[i]
+        if neg_score >= 0.5 and (pos_score < 0.1 or ((neg_score - pos_score) > 0.5)):
+            word_by_sentiment['negative'].append(w)
+        elif pos_score >= 0.5 and (neg_score < 0.1 or ((pos_score - neg_score) > 0.5)):
+            word_by_sentiment['positive'].append(w)
+
+    with open(CLASSIFICATION_FILE_PATH, 'wb') as classification_file:
+        json.dump(word_by_sentiment, classification_file)
+
     import IPython;IPython.embed()
 
     # print "Calculating class and vector for each word"
